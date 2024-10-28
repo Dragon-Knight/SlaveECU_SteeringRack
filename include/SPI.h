@@ -40,9 +40,6 @@ namespace SPI
 	SPIManager<4> manager(SPI_Config, SPI_Write, SPI_Read, SPI_WriteRead);
 	SPI_ZD25Q80B flash({GPIOB, GPIO_PIN_12}, SPI_BAUDRATEPRESCALER_2);
 	SPI_CAT25080 eeprom({GPIOA, GPIO_PIN_8}, SPI_BAUDRATEPRESCALER_8);
-	//SPI_HC595<1> hc595({GPIOA, GPIO_PIN_12}, {GPIOA, GPIO_PIN_13}, SPI_BAUDRATEPRESCALER_4);
-	SPI_HC165<4> hc165({GPIOB, GPIO_PIN_5}, {GPIOB, GPIO_PIN_4}, SPI_BAUDRATEPRESCALER_64);
-	//EasyPin pin(GPIOA, {GPIO_PIN_0, GPIO_MODE_OUTPUT_PP, GPIO_NOPULL, GPIO_SPEED_FREQ_HIGH}, GPIO_PIN_SET);
 
 	/*
 	#define COMPILE_TIME_SIZEOF(t)      template<int s> struct SIZEOF_ ## t ## _IS; \
@@ -136,7 +133,7 @@ namespace SPI
 		manager.AddDevice(flash);
 		manager.AddDevice(eeprom);
 		//manager.AddDevice(hc595);
-		manager.AddDevice(hc165);
+		//manager.AddDevice(hc165);
 		
 
 		uint8_t dev_id[3] = {0x00};
@@ -160,8 +157,8 @@ namespace SPI
 		if(current_time - last > 1500)
 		{
 			last= current_time;
-			qwewqeq();
-			qweqwerrr();
+			//qwewqeq();
+			//qweqwerrr();
 		}
 
 		current_time = HAL_GetTick();

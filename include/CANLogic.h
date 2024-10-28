@@ -30,26 +30,26 @@ namespace CANLib
 	// request | timer:15000
 	// byte	1 + 7	{ type[0] data[1..7] }
 	// Основная информация о блоке. См. "Системные параметры".
-	CANObject<uint8_t, 7> obj_block_info(0x0120);
+	CANObject<uint8_t, 7> obj_block_info(0x0720);
 
 	// 0x0121	BlockHealth
 	// request | event
 	// byte	1 + 7	{ type[0] data[1..7] }
 	// Информация о здоровье блока. См. "Системные параметры".
-	CANObject<uint8_t, 7> obj_block_health(0x0121);
+	CANObject<uint8_t, 7> obj_block_health(0x0721);
 
 	// 0x0122	BlockCfg
 	// request
 	// byte	1 + 1 + X	{ type[0] param[1] data[2..7] }
 	// Чтение и запись настроек блока. См. "Системные параметры".
-	CANObject<uint8_t, 7> obj_block_features(0x0122);
+	CANObject<uint8_t, 7> obj_block_features(0x0722);
 
 
 	// 0x0123	BlockError
 	// request | event
 	// byte	1 + X	{ type[0] data[1..7] }
 	// Ошибки блока. См. "Системные параметры".
-	CANObject<uint8_t, 7> obj_block_error(0x0123);
+	CANObject<uint8_t, 7> obj_block_error(0x0723);
 
 /*
 	CANObject<uint8_t, 1> obj_low_beam(0x00C5);
@@ -79,6 +79,7 @@ namespace CANLib
 	// set | event
 	// uint8_t	bitmask	1 + X	{ type[0] data[1] }
 	// Кнопка / светодиод 01 .. 16
+/*
 	CANObject<uint8_t, 1> obj_buttonled_01(0x0124);
 	CANObject<uint8_t, 1> obj_buttonled_02(0x0125);
 	CANObject<uint8_t, 1> obj_buttonled_03(0x0126);
@@ -105,7 +106,7 @@ namespace CANLib
 
 
 	CANObject<uint8_t, 2> obj_button_action(0x0789);
-	
+*/	
 	// --------------------------------------------------------------------------------------------
 
 	void HardwareSetup()
@@ -131,7 +132,7 @@ namespace CANLib
 		can_manager.RegisterObject(obj_block_health);
 		can_manager.RegisterObject(obj_block_features);
 		can_manager.RegisterObject(obj_block_error);
-
+/*
 		can_manager.RegisterObject(obj_buttonled_01);
 		can_manager.RegisterObject(obj_buttonled_02);
 		can_manager.RegisterObject(obj_buttonled_03);
@@ -152,7 +153,7 @@ namespace CANLib
 		can_manager.RegisterObject(obj_switch_2);
 		
 		can_manager.RegisterObject(obj_button_action);
-		
+*/		
 		
 		// Set versions data to block_info.
 		obj_block_info.SetValue(0, (About::board_type << 3 | About::board_ver), CAN_TIMER_TYPE_NORMAL);

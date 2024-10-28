@@ -5,17 +5,19 @@
 #include "About.h"
 #include "Leds.h"
 #include "CANLogic.h"
-#include "Buttons.h"
+#include "CAN_SPI.h"
 #include <Analog.h>
 
 ADC_HandleTypeDef hadc1;
 CAN_HandleTypeDef hcan;
+SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
 UART_HandleTypeDef hDebugUart;
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
+static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_ADC1_Init(void);
@@ -93,6 +95,7 @@ int main(void)
 	
 	MX_GPIO_Init();
 	MX_CAN_Init();
+	MX_SPI1_Init();
 	MX_SPI2_Init();
 	MX_USART1_UART_Init();
 	MX_ADC1_Init();
@@ -100,8 +103,8 @@ int main(void)
 	About::Setup();
 	Leds::Setup();
 	SPI::Setup();
+	CAN_SPI::Setup();
 	CANLib::Setup();
-	ButtonsLeds::Setup();
 	
 	Leds::obj.SetOn(Leds::LED_GREEN, 50, 1950);
 	
@@ -114,8 +117,8 @@ int main(void)
 		About::Loop(current_time);
 		Leds::Loop(current_time);
 		SPI::Loop(current_time);
+		CAN_SPI::Loop(current_time);
 		CANLib::Loop(current_time);
-		ButtonsLeds::Loop(current_time);
 	}
 }
 
@@ -212,6 +215,26 @@ static void MX_CAN_Init(void)
 	sFilterConfig.FilterActivation = ENABLE;
 	// sFilterConfig.SlaveStartFilterBank = 14;
 	if(HAL_CAN_ConfigFilter(&hcan, &sFilterConfig) != HAL_OK)
+	{
+		Error_Handler();
+	}
+}
+
+static void MX_SPI1_Init(void)
+{
+	hspi1.Instance = SPI1;
+	hspi1.Init.Mode = SPI_MODE_MASTER;
+	hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+	hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+	hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+	hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+	hspi1.Init.NSS = SPI_NSS_SOFT;
+	hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+	hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+	hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+	hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+	hspi1.Init.CRCPolynomial = 10;
+	if(HAL_SPI_Init(&hspi1) != HAL_OK)
 	{
 		Error_Handler();
 	}
