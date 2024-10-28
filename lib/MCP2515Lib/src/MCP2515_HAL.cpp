@@ -186,18 +186,16 @@ void MCP2515Class::Init()
 
 void MCP2515Class::Tick(uint32_t &time)
 {
-	if(time - _last_tick > 0)
+	if(time - _last_tick == 0) return;
+	_last_tick = time;
+	
+	if(_int_pin.Read() == GPIO_PIN_RESET)
 	{
-		_last_tick = time;
+		if(readRegister(REG_CANINTF) == 0) return;
 		
-		if(_int_pin.Read() == GPIO_PIN_RESET)
+		while(parsePacket() || _rxId != -1)
 		{
-			if(readRegister(REG_CANINTF) == 0) return;
-			
-			while(parsePacket() || _rxId != -1)
-			{
-				_onReceive(_rxId, _rxData, _rxLength);
-			}
+			_onReceive(_rxId, _rxData, _rxLength);
 		}
 	}
 	

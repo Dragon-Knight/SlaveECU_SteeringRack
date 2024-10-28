@@ -12,6 +12,7 @@ ADC_HandleTypeDef hadc1;
 CAN_HandleTypeDef hcan;
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
+TIM_HandleTypeDef htim4;
 UART_HandleTypeDef hDebugUart;
 
 void SystemClock_Config(void);
@@ -21,6 +22,7 @@ static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_TIM4_Init(void);
 
 
 
@@ -99,6 +101,7 @@ int main(void)
 	MX_SPI2_Init();
 	MX_USART1_UART_Init();
 	MX_ADC1_Init();
+	MX_TIM4_Init();
 	
 	About::Setup();
 	Leds::Setup();
@@ -282,6 +285,68 @@ static void MX_GPIO_Init(void)
 	__HAL_RCC_GPIOD_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 	__HAL_RCC_GPIOB_CLK_ENABLE();
+}
+
+static void MX_TIM4_Init(void)
+{
+	TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+	TIM_MasterConfigTypeDef sMasterConfig = {0};
+	TIM_OC_InitTypeDef sConfigOC = {0};
+
+	htim4.Instance = TIM4;
+	htim4.Init.Prescaler = 534;
+	htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+	htim4.Init.Period = 2400;
+	htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+	htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+	if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+/*
+	sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+	if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+	{
+		Error_Handler();
+	}
+*/
+
+	if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+/*
+	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+	if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+	{
+		Error_Handler();
+	}
+*/
+
+	sConfigOC.OCMode = TIM_OCMODE_PWM1;
+	sConfigOC.Pulse = 100;
+	sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
+	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+	if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	sConfigOC.Pulse = 800;
+	if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+	{
+		Error_Handler();
+	}
+
+	HAL_TIM_MspPostInit(&htim4);
+
+    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
+
+	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 2100);
 }
 
 void Error_Handler(void)

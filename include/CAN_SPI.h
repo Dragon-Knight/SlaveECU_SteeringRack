@@ -75,7 +75,8 @@ namespace CAN_SPI
 	{
 		uint8_t crc;
 		uint8_t _null;
-		uint8_t counter;
+		uint8_t counter : 4;
+		uint8_t error : 4;
 		uint8_t _rand;
 		int8_t roll;
 		int16_t angle;
@@ -106,7 +107,7 @@ namespace CAN_SPI
 			packet->roll -= 0x80;
 			packet->angle -= 0x8000;
 			
-			DEBUG_LOG_TOPIC("ExCAN RX", "Addr: %04X, angle:%05d, roll: %03d, counter:%02d, crc:%d:%d:%d\n", address, packet->angle, packet->roll, packet->counter, crc, packet->crc, (crc == packet->crc));
+			DEBUG_LOG_TOPIC("ExCAN RX", "Addr: %04X, angle:%05d, roll: %03d, counter:%02d, err: %02d, crc:%d:%d:%d\n", address, packet->angle, packet->roll, packet->counter, packet->error, crc, packet->crc, (crc == packet->crc));
 		}
 		
 		//DEBUG_LOG_TOPIC("ExCAN RX", "Addr: %d, Data (%d): %02X %02X %02X %02X %02X %02X %02X %02X\n", address, length, data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
