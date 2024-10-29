@@ -5,17 +5,17 @@
 
 #include "MCP2515_HAL.h"
 
-#define REG_BFPCTRL                0x0c
-#define REG_TXRTSCTRL              0x0d
+#define REG_BFPCTRL                0x0C
+#define REG_TXRTSCTRL              0x0D
 
-#define REG_CANCTRL                0x0f
+#define REG_CANCTRL                0x0F
 
 #define REG_CNF3                   0x28
 #define REG_CNF2                   0x29
-#define REG_CNF1                   0x2a
+#define REG_CNF1                   0x2A
 
-#define REG_CANINTE                0x2b
-#define REG_CANINTF                0x2c
+#define REG_CANINTE                0x2B
+#define REG_CANINTF                0x2C
 
 #define FLAG_RXnIE(n)              (0x01 << n)
 #define FLAG_RXnIF(n)              (0x01 << n)
@@ -55,126 +55,58 @@
 #define FLAG_RXM0                  0x20
 #define FLAG_RXM1                  0x40
 
-/*
-MCP2515Class::MCP2515Class(EasyPinD::d_pin_t cs_pin, EasyPinD::d_pin_t int_pin, uint32_t spi_prescaler) {}
-MCP2515Class::~MCP2515Class() {}
-*/
 
 
 
 
-
-
-
-
-
-int MCP2515Class::begin(uint32_t clock_frequency, uint32_t baud_rate, func_rx_t callback)
+bool MCP2515Class::begin(uint32_t clock_frequency, uint32_t baud_rate, func_rx_t callback)
 {
+	// Нет необходимости чистить всё полностью. Этого достаточно
+	_rx.flag = false;
+	_rx.id = NO_CAN_ID;
+	_tx.flag = false;
+	_tx.id = NO_CAN_ID;
+	
 	_onReceive = callback;
+	
+	reset();
 
-  _packetBegun = false;
-  _txId = -1;
-  _txRtr =false;
-  _txDlc = 0;
-  _txLength = 0;
-
-  _rxId = -1;
-  _rxRtr = false;
-  _rxDlc = 0;
-  _rxLength = 0;
-
-
-
-  // start SPI
-  //SPI.begin();
-
-  reset();
-
-  writeRegister(REG_CANCTRL, 0x80);
-  if (readRegister(REG_CANCTRL) != 0x80) {
-    return 0;
-  }
-
-
-  const uint8_t* cnf = nullptr;
-
-  for (unsigned int i = 0; i < (sizeof(_cnf_map) / sizeof(_cnf_map[0])); i++) {
-    if (_cnf_map[i].clockFrequency == clock_frequency && _cnf_map[i].baudRate == baud_rate) {
-      cnf = _cnf_map[i].cnf;
-      break;
-    }
-  }
-
-  if (cnf == nullptr) {
-    return 0;
-  }
-
-  writeRegister(REG_CNF1, cnf[0]);
-  writeRegister(REG_CNF2, cnf[1]);
-  writeRegister(REG_CNF3, cnf[2]);
-
-  writeRegister(REG_CANINTE, FLAG_RXnIE(1) | FLAG_RXnIE(0));
-  writeRegister(REG_BFPCTRL, 0x00);
-  writeRegister(REG_TXRTSCTRL, 0x00);
-  writeRegister(REG_RXBnCTRL(0), FLAG_RXM1 | FLAG_RXM0);
-  writeRegister(REG_RXBnCTRL(1), FLAG_RXM1 | FLAG_RXM0);
-
-  writeRegister(REG_CANCTRL, 0x00);
-  if (readRegister(REG_CANCTRL) != 0x00) {
-    return 0;
-  }
-
-  return 1;
+	if( writeReadRegister(REG_CANCTRL, 0x80) == false ) return false;
+	
+	const uint8_t *cnf = nullptr;
+	for(uint8_t i = 0; i < (sizeof(_cnf_map) / sizeof(_cnf_map[0])); ++i)
+	{
+		if(_cnf_map[i].clockFrequency == clock_frequency && _cnf_map[i].baudRate == baud_rate)
+		{
+			cnf = _cnf_map[i].cnf;
+			break;
+		}
+	}
+	
+	if(cnf == nullptr) return false;
+	
+	writeRegister(REG_CNF1, cnf[0]);
+	writeRegister(REG_CNF2, cnf[1]);
+	writeRegister(REG_CNF3, cnf[2]);
+	
+	writeRegister(REG_CANINTE, FLAG_RXnIE(1) | FLAG_RXnIE(0));
+	writeRegister(REG_BFPCTRL, 0x00);
+	writeRegister(REG_TXRTSCTRL, 0x00);
+	writeRegister(REG_RXBnCTRL(0), FLAG_RXM1 | FLAG_RXM0);
+	writeRegister(REG_RXBnCTRL(1), FLAG_RXM1 | FLAG_RXM0);
+	
+	if( writeReadRegister(REG_CANCTRL, 0x00) == false ) return false;
+	
+	return true;
 }
 
 void MCP2515Class::end()
 {
-  //SPI.end();
+	return;
 }
 
-int MCP2515Class::beginPacket(int id, int dlc, bool rtr)
-{
-  if (id < 0 || id > 0x7FF) {
-    return 0;
-  }
 
-  if (dlc > 8) {
-    return 0;
-  }
 
-  _packetBegun = true;
-  _txId = id;
-  _txExtended = false;
-  _txRtr = rtr;
-  _txDlc = dlc;
-  _txLength = 0;
-
-  memset(_txData, 0x00, sizeof(_txData));
-
-  return 1;
-}
-
-int MCP2515Class::beginExtendedPacket(long id, int dlc, bool rtr)
-{
-  if (id < 0 || id > 0x1FFFFFFF) {
-    return 0;
-  }
-
-  if (dlc > 8) {
-    return 0;
-  }
-
-  _packetBegun = true;
-  _txId = id;
-  _txExtended = true;
-  _txRtr = rtr;
-  _txDlc = dlc;
-  _txLength = 0;
-
-  memset(_txData, 0x00, sizeof(_txData));
-
-  return 1;
-}
 
 
 void MCP2515Class::Init()
@@ -193,9 +125,9 @@ void MCP2515Class::Tick(uint32_t &time)
 	{
 		if(readRegister(REG_CANINTF) == 0) return;
 		
-		while(parsePacket() || _rxId != -1)
+		while(parsePacket() || _rx.id != NO_CAN_ID)
 		{
-			_onReceive(_rxId, _rxData, _rxLength);
+			_onReceive(_rx.id, _rx.data, _rx.length);
 		}
 	}
 	
@@ -206,231 +138,260 @@ void MCP2515Class::Tick(uint32_t &time)
 
 
 
-
-
-
-int MCP2515Class::endPacket()
+bool MCP2515Class::beginPacket(uint16_t id, uint8_t dlc, bool rtr)
 {
-  if (!_packetBegun) {
-    return 0;
-  }
-  _packetBegun = false;
-
-  if (_txDlc >= 0) {
-    _txLength = _txDlc;
-  }
-
-  int n = 0;
-
-  if (_txExtended) {
-    writeRegister(REG_TXBnSIDH(n), _txId >> 21);
-    writeRegister(REG_TXBnSIDL(n), (((_txId >> 18) & 0x07) << 5) | FLAG_EXIDE | ((_txId >> 16) & 0x03));
-    writeRegister(REG_TXBnEID8(n), (_txId >> 8) & 0xff);
-    writeRegister(REG_TXBnEID0(n), _txId & 0xff);
-  } else {
-    writeRegister(REG_TXBnSIDH(n), _txId >> 3);
-    writeRegister(REG_TXBnSIDL(n), _txId << 5);
-    writeRegister(REG_TXBnEID8(n), 0x00);
-    writeRegister(REG_TXBnEID0(n), 0x00);
-  }
-
-  if (_txRtr) {
-    writeRegister(REG_TXBnDLC(n), 0x40 | _txLength);
-  } else {
-    writeRegister(REG_TXBnDLC(n), _txLength);
-
-    for (int i = 0; i < _txLength; i++) {
-      writeRegister(REG_TXBnD0(n) + i, _txData[i]);
-    }
-  }
-
-  writeRegister(REG_TXBnCTRL(n), 0x08);
-
-  bool aborted = false;
-
-  while (readRegister(REG_TXBnCTRL(n)) & 0x08) {
-    if (readRegister(REG_TXBnCTRL(n)) & 0x10) {
-      // abort
-      aborted = true;
-
-      modifyRegister(REG_CANCTRL, 0x10, 0x10);
-    }
-
-    //yield();
-  }
-
-  if (aborted) {
-    // clear abort command
-    modifyRegister(REG_CANCTRL, 0x10, 0x00);
-  }
-
-  modifyRegister(REG_CANINTF, FLAG_TXnIF(n), 0x00);
-
-  return (readRegister(REG_TXBnCTRL(n)) & 0x70) ? 0 : 1;
+	if(id > 0x7FF) return false;
+	if(dlc > 8) return false;
+	
+	_tx.flag = true;
+	_tx.id = id;
+	_tx.extended = false;
+	_tx.rtr = rtr;
+	_tx.dlc = dlc;
+	_tx.length = 0;
+	memset(_tx.data, 0x00, sizeof(_tx.data));
+	
+	return true;
 }
 
-int MCP2515Class::parsePacket()
+bool MCP2515Class::beginExtendedPacket(uint32_t id, uint8_t dlc, bool rtr)
 {
-  int n;
-
-  uint8_t intf = readRegister(REG_CANINTF);
-
-  if (intf & FLAG_RXnIF(0)) {
-    n = 0;
-  } else if (intf & FLAG_RXnIF(1)) {
-    n = 1;
-  } else {
-    _rxId = -1;
-    _rxExtended = false;
-    _rxRtr = false;
-    _rxLength = 0;
-    return 0;
-  }
-
-  _rxExtended = (readRegister(REG_RXBnSIDL(n)) & FLAG_IDE) ? true : false;
-
-  uint32_t idA = ((readRegister(REG_RXBnSIDH(n)) << 3) & 0x07f8) | ((readRegister(REG_RXBnSIDL(n)) >> 5) & 0x07);
-  if (_rxExtended) {
-    uint32_t idB = (((uint32_t)(readRegister(REG_RXBnSIDL(n)) & 0x03) << 16) & 0x30000) | ((readRegister(REG_RXBnEID8(n)) << 8) & 0xff00) | readRegister(REG_RXBnEID0(n));
-
-    _rxId = (idA << 18) | idB;
-    _rxRtr = (readRegister(REG_RXBnDLC(n)) & FLAG_RTR) ? true : false;
-  } else {
-    _rxId = idA;
-    _rxRtr = (readRegister(REG_RXBnSIDL(n)) & FLAG_SRR) ? true : false;
-  }
-  _rxDlc = readRegister(REG_RXBnDLC(n)) & 0x0f;
-
-  if (_rxRtr) {
-    _rxLength = 0;
-  } else {
-    _rxLength = _rxDlc;
-
-    for (int i = 0; i < _rxLength; i++) {
-      _rxData[i] = readRegister(REG_RXBnD0(n) + i);
-    }
-  }
-
-  modifyRegister(REG_CANINTF, FLAG_RXnIF(n), 0x00);
-
-  return _rxDlc;
+	if(id > 0x1FFFFFFF) return false;
+	if(dlc > 8) return false;
+	
+	_tx.flag = true;
+	_tx.id = id;
+	_tx.extended = true;
+	_tx.rtr = rtr;
+	_tx.dlc = dlc;
+	_tx.length = 0;
+	memset(_tx.data, 0x00, sizeof(_tx.data));
+	
+	return true;
 }
 
-int MCP2515Class::filter(int id, int mask)
+uint8_t MCP2515Class::write(const uint8_t *buffer, uint8_t size)
 {
-  id &= 0x7ff;
-  mask &= 0x7ff;
-
-  // config mode
-  writeRegister(REG_CANCTRL, 0x80);
-  if (readRegister(REG_CANCTRL) != 0x80) {
-    return 0;
-  }
-
-  for (int n = 0; n < 2; n++) {
-    // standard only
-    writeRegister(REG_RXBnCTRL(n), FLAG_RXM0);
-    writeRegister(REG_RXBnCTRL(n), FLAG_RXM0);
-
-    writeRegister(REG_RXMnSIDH(n), mask >> 3);
-    writeRegister(REG_RXMnSIDL(n), mask << 5);
-    writeRegister(REG_RXMnEID8(n), 0);
-    writeRegister(REG_RXMnEID0(n), 0);
-  }
-
-  for (int n = 0; n < 6; n++) {
-    writeRegister(REG_RXFnSIDH(n), id >> 3);
-    writeRegister(REG_RXFnSIDL(n), id << 5);
-    writeRegister(REG_RXFnEID8(n), 0);
-    writeRegister(REG_RXFnEID0(n), 0);
-  }
-
-  // normal mode
-  writeRegister(REG_CANCTRL, 0x00);
-  if (readRegister(REG_CANCTRL) != 0x00) {
-    return 0;
-  }
-
-  return 1;
+	if(_tx.flag == false) return 0;
+	
+	if(size > (sizeof(_tx.data) - _tx.length))
+	{
+		size = sizeof(_tx.data) - _tx.length;
+	}
+	memcpy(&_tx.data[_tx.length], buffer, size);
+	_tx.length += size;
+	
+	return size;
 }
 
-int MCP2515Class::filterExtended(long id, long mask)
+bool MCP2515Class::endPacket()
 {
-  id &= 0x1FFFFFFF;
-  mask &= 0x1FFFFFFF;
-
-  // config mode
-  writeRegister(REG_CANCTRL, 0x80);
-  if (readRegister(REG_CANCTRL) != 0x80) {
-    return 0;
-  }
-
-  for (int n = 0; n < 2; n++) {
-    // extended only
-    writeRegister(REG_RXBnCTRL(n), FLAG_RXM1);
-    writeRegister(REG_RXBnCTRL(n), FLAG_RXM1);
-
-    writeRegister(REG_RXMnSIDH(n), mask >> 21);
-    writeRegister(REG_RXMnSIDL(n), (((mask >> 18) & 0x03) << 5) | FLAG_EXIDE | ((mask >> 16) & 0x03));
-    writeRegister(REG_RXMnEID8(n), (mask >> 8) & 0xff);
-    writeRegister(REG_RXMnEID0(n), mask & 0xff);
-  }
-
-  for (int n = 0; n < 6; n++) {
-    writeRegister(REG_RXFnSIDH(n), id >> 21);
-    writeRegister(REG_RXFnSIDL(n), (((id >> 18) & 0x03) << 5) | FLAG_EXIDE | ((id >> 16) & 0x03));
-    writeRegister(REG_RXFnEID8(n), (id >> 8) & 0xff);
-    writeRegister(REG_RXFnEID0(n), id & 0xff);
-  }
-
-  // normal mode
-  writeRegister(REG_CANCTRL, 0x00);
-  if (readRegister(REG_CANCTRL) != 0x00) {
-    return 0;
-  }
-
-  return 1;
+	if(_tx.flag == false) return false;
+	_tx.flag = false;
+	
+	if(_tx.dlc >= 0)
+		_tx.length = _tx.dlc;
+	
+	uint8_t n = 0;
+	if(_tx.extended == true)
+	{
+		writeRegister(REG_TXBnSIDH(n), _tx.id >> 21);
+		writeRegister(REG_TXBnSIDL(n), (((_tx.id >> 18) & 0x07) << 5) | FLAG_EXIDE | ((_tx.id >> 16) & 0x03));
+		writeRegister(REG_TXBnEID8(n), (_tx.id >> 8) & 0xff);
+		writeRegister(REG_TXBnEID0(n), _tx.id & 0xff);
+	} else {
+		writeRegister(REG_TXBnSIDH(n), _tx.id >> 3);
+		writeRegister(REG_TXBnSIDL(n), _tx.id << 5);
+		writeRegister(REG_TXBnEID8(n), 0x00);
+		writeRegister(REG_TXBnEID0(n), 0x00);
+	}
+	
+	if(_tx.rtr == true)
+	{
+		writeRegister(REG_TXBnDLC(n), 0x40 | _tx.length);
+	} else {
+		writeRegister(REG_TXBnDLC(n), _tx.length);
+		
+		for(uint8_t i = 0; i < _tx.length; ++i)
+		{
+			writeRegister(REG_TXBnD0(n) + i, _tx.data[i]);
+		}
+	}
+	
+	writeRegister(REG_TXBnCTRL(n), 0x08);
+	
+	bool aborted = false;
+	while(readRegister(REG_TXBnCTRL(n)) & 0x08)
+	{
+		if(readRegister(REG_TXBnCTRL(n)) & 0x10)
+		{
+			aborted = true;
+			
+			modifyRegister(REG_CANCTRL, 0x10, 0x10);
+		}
+	}
+	if(aborted)
+	{
+		// clear abort command
+		modifyRegister(REG_CANCTRL, 0x10, 0x00);
+	}
+	
+	modifyRegister(REG_CANINTF, FLAG_TXnIF(n), 0x00);
+	
+	return ((readRegister(REG_TXBnCTRL(n)) & 0x70) ? false : true);
 }
 
-int MCP2515Class::observe()
-{
-  writeRegister(REG_CANCTRL, 0x60);
-  if (readRegister(REG_CANCTRL) != 0x60) {
-    return 0;
-  }
 
-  return 1;
+
+
+
+uint8_t MCP2515Class::parsePacket()
+{
+	uint8_t n;
+	uint8_t intf = readRegister(REG_CANINTF);
+	if(intf & FLAG_RXnIF(0))
+		n = 0;
+	else if(intf & FLAG_RXnIF(1))
+		n = 1;
+	else
+	{
+		_rx.id = NO_CAN_ID;
+		
+		return 0;
+	}
+	
+	_rx.extended = (readRegister(REG_RXBnSIDL(n)) & FLAG_IDE) ? true : false;
+	
+	uint32_t idA = ((readRegister(REG_RXBnSIDH(n)) << 3) & 0x07f8) | ((readRegister(REG_RXBnSIDL(n)) >> 5) & 0x07);
+	if(_rx.extended == true)
+	{
+		uint32_t idB = (((uint32_t)(readRegister(REG_RXBnSIDL(n)) & 0x03) << 16) & 0x30000) | ((readRegister(REG_RXBnEID8(n)) << 8) & 0xff00) | readRegister(REG_RXBnEID0(n));
+		
+		_rx.id = (idA << 18) | idB;
+		_rx.rtr = (readRegister(REG_RXBnDLC(n)) & FLAG_RTR) ? true : false;
+	}
+	else
+	{
+		_rx.id = idA;
+		_rx.rtr = (readRegister(REG_RXBnSIDL(n)) & FLAG_SRR) ? true : false;
+	}
+	
+	_rx.dlc = readRegister(REG_RXBnDLC(n)) & 0x0f;
+	
+	if(_rx.rtr == true)
+		_rx.length = 0;
+	else
+	{
+		_rx.length = _rx.dlc;
+		
+		for(uint8_t i = 0; i < _rx.length; ++i)
+		{
+			_rx.data[i] = readRegister(REG_RXBnD0(n) + i);
+		}
+	}
+	
+	modifyRegister(REG_CANINTF, FLAG_RXnIF(n), 0x00);
+	
+	return _rx.dlc;
 }
 
-int MCP2515Class::loopback()
-{
-  writeRegister(REG_CANCTRL, 0x40);
-  if (readRegister(REG_CANCTRL) != 0x40) {
-    return 0;
-  }
 
-  return 1;
+
+
+
+bool MCP2515Class::filter(uint16_t id, uint16_t mask)
+{
+	id &= 0x7ff;
+	mask &= 0x7ff;
+	
+	if( writeReadRegister(REG_CANCTRL, 0x80) == false ) return false;
+	
+	uint8_t n;
+	for(n = 0; n < 2; ++n)
+	{
+		// standard only
+		writeRegister(REG_RXBnCTRL(n), FLAG_RXM0);
+		writeRegister(REG_RXBnCTRL(n), FLAG_RXM0);
+
+		writeRegister(REG_RXMnSIDH(n), mask >> 3);
+		writeRegister(REG_RXMnSIDL(n), mask << 5);
+		writeRegister(REG_RXMnEID8(n), 0);
+		writeRegister(REG_RXMnEID0(n), 0);
+	}
+	
+	for(n = 0; n < 6; ++n)
+	{
+		writeRegister(REG_RXFnSIDH(n), id >> 3);
+		writeRegister(REG_RXFnSIDL(n), id << 5);
+		writeRegister(REG_RXFnEID8(n), 0);
+		writeRegister(REG_RXFnEID0(n), 0);
+	}
+	
+	if( writeReadRegister(REG_CANCTRL, 0x00) == false ) return false;
+	
+	return true;
 }
 
-int MCP2515Class::sleep()
+bool MCP2515Class::filterExtended(uint32_t id, uint32_t mask)
 {
-  writeRegister(REG_CANCTRL, 0x01);
-  if (readRegister(REG_CANCTRL) != 0x01) {
-    return 0;
-  }
+	id &= 0x1FFFFFFF;
+	mask &= 0x1FFFFFFF;
+	
+	if( writeReadRegister(REG_CANCTRL, 0x80) == false ) return false;
+	
+	uint8_t n;
+	for(n = 0; n < 2; ++n)
+	{
+		// extended only
+		writeRegister(REG_RXBnCTRL(n), FLAG_RXM1);
+		writeRegister(REG_RXBnCTRL(n), FLAG_RXM1);
 
-  return 1;
+		writeRegister(REG_RXMnSIDH(n), mask >> 21);
+		writeRegister(REG_RXMnSIDL(n), (((mask >> 18) & 0x03) << 5) | FLAG_EXIDE | ((mask >> 16) & 0x03));
+		writeRegister(REG_RXMnEID8(n), (mask >> 8) & 0xff);
+		writeRegister(REG_RXMnEID0(n), mask & 0xff);
+	}
+	
+	for(n = 0; n < 6; ++n)
+	{
+		writeRegister(REG_RXFnSIDH(n), id >> 21);
+		writeRegister(REG_RXFnSIDL(n), (((id >> 18) & 0x03) << 5) | FLAG_EXIDE | ((id >> 16) & 0x03));
+		writeRegister(REG_RXFnEID8(n), (id >> 8) & 0xff);
+		writeRegister(REG_RXFnEID0(n), id & 0xff);
+	}
+	
+	if( writeReadRegister(REG_CANCTRL, 0x00) == false ) return false;
+	
+	return true;
 }
 
-int MCP2515Class::wakeup()
-{
-  writeRegister(REG_CANCTRL, 0x00);
-  if (readRegister(REG_CANCTRL) != 0x00) {
-    return 0;
-  }
 
-  return 1;
+
+
+
+bool MCP2515Class::cmd_observe()
+{
+	return writeReadRegister(REG_CANCTRL, 0x60);
 }
+
+bool MCP2515Class::cmd_loopback()
+{
+	return writeReadRegister(REG_CANCTRL, 0x40);
+}
+
+bool MCP2515Class::cmd_sleep()
+{
+	return writeReadRegister(REG_CANCTRL, 0x01);
+}
+
+bool MCP2515Class::cmd_wakeup()
+{
+	return writeReadRegister(REG_CANCTRL, 0x00);
+}
+
+
+
+
 
 
 /*
@@ -457,71 +418,6 @@ void MCP2515Class::dumpRegisters(Stream& out)
 
 
 
-
-
-
-long MCP2515Class::packetId()
-{
-  return _rxId;
-}
-
-bool MCP2515Class::packetExtended()
-{
-  return _rxExtended;
-}
-
-bool MCP2515Class::packetRtr()
-{
-  return _rxRtr;
-}
-
-int MCP2515Class::packetDlc()
-{
-  return _rxDlc;
-}
-
-size_t MCP2515Class::write(uint8_t byte)
-{
-  return write(&byte, sizeof(byte));
-}
-
-size_t MCP2515Class::write(const uint8_t *buffer, size_t size)
-{
-  if (!_packetBegun) {
-    return 0;
-  }
-
-  if (size > (sizeof(_txData) - _txLength)) {
-    size = sizeof(_txData) - _txLength;
-  }
-
-  memcpy(&_txData[_txLength], buffer, size);
-  _txLength += size;
-
-  return size;
-}
-
-
-
-
-
-int MCP2515Class::available()
-{
-  return _rxLength;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
 void MCP2515Class::reset()
 {
 	DeviceActivate();
@@ -530,7 +426,6 @@ void MCP2515Class::reset()
 	DeviceDeactivate();
 	
 	//delayMicroseconds(10);
-
 	HAL_Delay(5);
 	
 	return;
@@ -565,4 +460,12 @@ void MCP2515Class::writeRegister(uint8_t address, uint8_t value)
 	DeviceDeactivate();
 	
 	return;
+}
+
+bool MCP2515Class::writeReadRegister(uint8_t address, uint8_t value)
+{
+	writeRegister(address, value);
+	if(readRegister(address) != value) return false;
+	
+	return true;
 }
