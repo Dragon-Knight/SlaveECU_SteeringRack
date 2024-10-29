@@ -22,23 +22,7 @@ namespace CAN_SPI
 
 
 
-		void _ReverseArray(uint8_t *array, uint8_t length)
-		{
-			uint8_t i = 0;
-			uint8_t j = length - 1;
-			uint8_t temp;
-			while(i < j)
-			{
-				temp = array[i];
-				array[i] = array[j];
-				array[j] = temp;
-				
-				i++;
-				j--;
-			}
 
-			return;
-		}
 
 
 
@@ -71,43 +55,107 @@ namespace CAN_SPI
 		HAL_SPI_WriteReadFast(&hspi1, tx_data, rx_data, length, 200);
 	}
 
-	struct __attribute__((packed)) sensor_479452659R_r
-	{
-		uint8_t crc;
-		uint8_t _null;
-		uint8_t counter : 4;
-		uint8_t error : 4;
-		uint8_t _rand;
-		int8_t roll;
-		int16_t angle;
-	};
 
 
-	uint8_t CalcCRC(uint8_t *data, uint8_t length)
-	{
-		uint8_t crc = 0xFF;
+
+
+
+class SteeringAngleSensor
+{
+	static constexpr uint16_t PACKET_ID = 0x00C2;
+	static constexpr uint8_t PACKET_LENGTH = 7;
+	
+	public:
+
+		SteeringAngleSensor() : _last_count(255)
+		{}
 		
-		for(uint8_t i = 0; i < length; ++i)
+		struct __attribute__((packed)) sensor_t
 		{
-			crc -= data[i];
+			uint8_t crc;
+			uint8_t _null;
+			uint8_t counter : 4;
+			uint8_t error : 4;
+			int16_t roll;
+			int16_t angle;
+		};
+		
+		bool PutPacket(uint16_t id, uint8_t *raw, uint8_t length)
+		{
+			if(id != PACKET_ID) return false;
+			if(length != PACKET_LENGTH) return false;
+			
+			memcpy(_raw_array, raw, length);
+			_ReverseArray();
+			_FixParams();
+			
+			if(_obj->counter == _last_count) return false;
+			_last_count = _obj->counter;
+			
+			return true;
 		}
 
-		return crc;
-	}
+		const sensor_t *data = (sensor_t *) _raw_array;
+
+	private:
+		
+		void _ReverseArray()
+		{
+			uint8_t i = 0;
+			uint8_t j = (PACKET_LENGTH - 1);
+			uint8_t temp;
+			while(i < j)
+			{
+				temp = _raw_array[i];
+				_raw_array[i] = _raw_array[j];
+				_raw_array[j] = temp;
+				
+				i++; j--;
+			}
+		}
+		
+		uint8_t _CalculateCRC()
+		{
+			uint8_t crc = 0xFF;
+			for(uint8_t i = 0; i < (PACKET_LENGTH - 1); ++i)
+			{
+				crc -= _raw_array[i];
+			}
+			return crc;
+		}
+
+		void _FixParams()
+		{
+			_obj->angle -= 0x8000;
+			_obj->roll -= 0x8000;
+			
+			return;
+		}
+		
+		uint8_t _last_count;
+		
+		uint8_t _raw_array[PACKET_LENGTH];
+		sensor_t *_obj = (sensor_t *) _raw_array;
+};
+
+
+
+
+
+
+
+
+
+	SteeringAngleSensor sensor1;
+	SteeringAngleSensor sensor2;
 
 
 	void CAN_RX(uint32_t address, uint8_t *data, uint8_t length)
 	{
-		if(address == 0x00C2)
+		bool result = sensor1.PutPacket(address, data, length);
+		if(result == true)
 		{
-			uint8_t crc = CalcCRC(data, length-1);
-			_ReverseArray(data, length);
-
-			sensor_479452659R_r *packet = (sensor_479452659R_r *)data;
-			packet->roll -= 0x80;
-			packet->angle -= 0x8000;
-			
-			DEBUG_LOG_TOPIC("ExCAN RX", "Addr: %04X, angle:%05d, roll: %03d, counter:%02d, err: %02d, crc:%d:%d:%d\n", address, packet->angle, packet->roll, packet->counter, packet->error, crc, packet->crc, (crc == packet->crc));
+			DEBUG_LOG_TOPIC("ExCAN RX", "Addr: %04X, angle:%+05d, roll: %+05d, err: %02d\n", address, sensor1.data->angle, sensor1.data->roll, sensor1.data->error);
 		}
 		
 		//DEBUG_LOG_TOPIC("ExCAN RX", "Addr: %d, Data (%d): %02X %02X %02X %02X %02X %02X %02X %02X\n", address, length, data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
