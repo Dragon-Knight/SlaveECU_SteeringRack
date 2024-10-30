@@ -1,7 +1,8 @@
 #pragma once
 #include <inttypes.h>
 #include <EasyPinD.h>
-#include <MCP2515_HAL.h>
+#include <SPIManager.h>
+#include <drivers/SPI_MCP2515.h>
 
 extern SPI_HandleTypeDef hspi1;
 
@@ -164,8 +165,8 @@ class SteeringAngleSensor
 	
 	
 	SPIManager<2> manager(SPI_Config, SPI_Write, SPI_Read, SPI_WriteRead);
-	MCP2515Class obj1(SPI_CS_CAN1, CAN1_RX_INT, SPI_BAUDRATEPRESCALER_8);
-	MCP2515Class obj2(SPI_CS_CAN2, CAN2_RX_INT, SPI_BAUDRATEPRESCALER_8);
+	SPI_MCP2515 obj1(SPI_CS_CAN1, CAN1_RX_INT, SPI_BAUDRATEPRESCALER_8);
+	SPI_MCP2515 obj2(SPI_CS_CAN2, CAN2_RX_INT, SPI_BAUDRATEPRESCALER_8);
 	EasyPinD pin_rs_1(CAN1_RS.Port, {CAN1_RS.Pin, GPIO_MODE_OUTPUT_OD, GPIO_NOPULL, GPIO_SPEED_FREQ_HIGH}, GPIO_PIN_SET);
 	EasyPinD pin_sens_1(CAN1_SENS_PWR.Port, {CAN1_SENS_PWR.Pin, GPIO_MODE_OUTPUT_PP, GPIO_NOPULL, GPIO_SPEED_FREQ_HIGH}, GPIO_PIN_RESET);
 	EasyPinD pin_rs_2(CAN2_RS.Port, {CAN2_RS.Pin, GPIO_MODE_OUTPUT_OD, GPIO_NOPULL, GPIO_SPEED_FREQ_HIGH}, GPIO_PIN_SET);
