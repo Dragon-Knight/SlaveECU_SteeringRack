@@ -5,6 +5,7 @@
 #include "About.h"
 #include "Leds.h"
 #include "CANLogic.h"
+#include "SteeringRack.h"
 #include "CAN_SPI.h"
 #include <Analog.h>
 
@@ -108,6 +109,7 @@ int main(void)
 	SPI::Setup();
 	CAN_SPI::Setup();
 	CANLib::Setup();
+	SteeringRack::Setup();
 	
 	Leds::obj.SetOn(Leds::LED_GREEN, 50, 1950);
 	
@@ -122,6 +124,7 @@ int main(void)
 		SPI::Loop(current_time);
 		CAN_SPI::Loop(current_time);
 		CANLib::Loop(current_time);
+		SteeringRack::Loop(current_time);
 	}
 }
 
@@ -294,9 +297,9 @@ static void MX_TIM4_Init(void)
 	TIM_OC_InitTypeDef sConfigOC = {0};
 
 	htim4.Instance = TIM4;
-	htim4.Init.Prescaler = 534;
+	htim4.Init.Prescaler = 63;
 	htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim4.Init.Period = 2400;
+	htim4.Init.Period = 19999;
 	htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 	if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
@@ -327,26 +330,21 @@ static void MX_TIM4_Init(void)
 */
 
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	sConfigOC.Pulse = 100;
+	sConfigOC.Pulse = 1500;
 	sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
-	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+	sConfigOC.OCFastMode = TIM_OCFAST_ENABLE;
 	if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
 	{
 		Error_Handler();
 	}
 
-	sConfigOC.Pulse = 800;
+	sConfigOC.Pulse = 1500;
 	if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
 	{
 		Error_Handler();
 	}
 
 	HAL_TIM_MspPostInit(&htim4);
-
-    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
-    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
-
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 2100);
 }
 
 void Error_Handler(void)
