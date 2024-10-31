@@ -23,36 +23,39 @@ namespace SteeringRack
 
 
 
-class PIDController {
-private:
-    float kp, ki, kd;           // Коэффициенты PID
-    float integral, previous_error; // Накопление для интегральной части и предыдущее значение ошибки
-    //float output_limit_min, output_limit_max; // Ограничения выхода для ШИМ
+class PIDController
+{
+	public:
+		
+		PIDController(float kp, float ki, float kd, float out_min, float out_max) : 
+			_kp(kp), _ki(ki), _kd(kd), _out_min(out_min), _out_max(out_max), _integral(0), _previous_error(0)
+		{}
+		
+		float Calculate(float setpoint, float measured_value, float dt)
+		{
+			float error = setpoint - measured_value;			// Вычисление ошибки
+			float derivative = (error - _previous_error) / dt;	// Производная часть
+			_integral += error * dt;							// Интегральная часть
+			_previous_error = error;
+			
+			// Рассчитываем выход
+			float output = _kp * error + _ki * _integral + _kd * derivative;
+			
+			// Ограничиваем выход для ШИМ
+			//if(output > output_limit_max) output = output_limit_max;
+			//else if(output < output_limit_min) output = output_limit_min;
+			
+			return output;
+		}
+		
+	private:
+		float _kp, _ki, _kd;		// Коэффициенты PID
+		float _out_min, _out_max;	// Лимиты для расчёта PID
+		float _integral;			// Накопление для интегральной части
+		float _previous_error;		// Предыдущее значение ошибки
 
-public:
-    PIDController(float p, float i, float d, float min_output, float max_output)
-        : kp(p), ki(i), kd(d), integral(0), previous_error(0)/*,
-          output_limit_min(min_output), output_limit_max(max_output)*/ {}
 
-    // Функция расчета PID
-    float calculate(float setpoint, float measured_value, float dt) {
-        float error = setpoint - measured_value;         // Вычисление ошибки
-        integral += error * dt;                          // Интегральная часть
-        float derivative = (error - previous_error) / dt; // Производная часть
-        previous_error = error;
-
-        // Рассчитываем выход
-        float output = kp * error + ki * integral + kd * derivative;
-
-        // Ограничиваем выход для ШИМ
-        //if (output > output_limit_max) output = output_limit_max;
-       // else if (output < output_limit_min) output = output_limit_min;
-
-        return output;
-    }
 };
-
-
 
 
 
@@ -61,7 +64,7 @@ public:
 class SteeringControl
 {
 	public:
-		SteeringControl(float p, float i, float d, float min_pwm, float mid_pwm, float max_pwm, TIM_HandleTypeDef *htim_pwm, uint32_t pwm_channel) : 
+		SteeringControl(float p, float i, float d, uint16_t min_pwm, uint16_t mid_pwm, uint16_t max_pwm, TIM_HandleTypeDef *htim_pwm, uint32_t pwm_channel) : 
 			_pid(p, i, d, min_pwm, max_pwm), _htim(htim_pwm), _channel(pwm_channel), _pwm_min(min_pwm), _pwm_mid(mid_pwm), _pwm_max(max_pwm), 
 			_target(0.0f)
 		{}
@@ -76,29 +79,34 @@ class SteeringControl
 		// Функция для обновления ПИД и управления ШИМ
 		void Update(float measured_value, float dt)
 		{
-			float pid_output = _pid.calculate(_target, measured_value, dt);
-			int32_t value = ((int32_t)(pid_output + 0.5f)) + (int32_t)_pwm_mid;
-			uint16_t pwm = clamp(value, _pwm_min, _pwm_max);
+			float pid_output = _pid.Calculate(_target, measured_value, dt);
+			uint16_t pwm = ((int32_t)(pid_output + 0.5f)) + (int32_t)_pwm_mid;
+
+			DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d;\n", pid_output, pwm);
 			
-			DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d, PWM: %d\n", pid_output, value, pwm);
+			if(pwm < _pwm_min && pwm > _pwm_max) pwm = _pwm_mid;		// ???????????????????????????????
 			
-			// Преобразуем вывод PID в значение ШИМ и устанавливаем его
 			__HAL_TIM_SET_COMPARE(_htim, _channel, pwm);
 			
 			return;
 		}
 		
 	private:
+
+		uint16_t _FastFuse(uint16_t pwm)
+		{
+
+		}
 		
 		uint16_t clamp(uint16_t value, uint16_t min, uint16_t max)
 		{
 			return (value < min) ? min : (value > max) ? max : value;
 		}
 		
-		PIDController _pid;      // Экземпляр PID-контроллера
-		TIM_HandleTypeDef *_htim; // Указатель на таймер для управления ШИМ
-		uint32_t _channel;       // Канал ШИМ
-		float _pwm_min, _pwm_mid, _pwm_max;
+		PIDController _pid;			// Экземпляр PID-контроллера
+		TIM_HandleTypeDef *_htim;	// Указатель на таймер для управления ШИМ
+		uint32_t _channel;			// Канал ШИМ
+		uint16_t _pwm_min, _pwm_mid, _pwm_max;
 		float _target;
 };
 
