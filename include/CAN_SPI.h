@@ -3,31 +3,28 @@
 #include <EasyPinD.h>
 #include <SPIManager.h>
 #include <drivers/SPI_MCP2515.h>
+#include <SteeringAngleSensor.h>
 
 extern SPI_HandleTypeDef hspi1;
 
 namespace CAN_SPI
 {
-
-	static constexpr EasyPinD::d_pin_t SPI_CS_CAN1 = {GPIOB, GPIO_PIN_11};
+	
+	static constexpr EasyPinD::d_pin_t CAN1_SPI_CS = {GPIOB, GPIO_PIN_11};
 	static constexpr EasyPinD::d_pin_t CAN1_RX_INT = {GPIOB, GPIO_PIN_10};
 	static constexpr EasyPinD::d_pin_t CAN1_RS = {GPIOB, GPIO_PIN_2};
 	static constexpr EasyPinD::d_pin_t CAN1_SENS_PWR = {GPIOA, GPIO_PIN_3};
-
-	static constexpr EasyPinD::d_pin_t SPI_CS_CAN2 = {GPIOB, GPIO_PIN_3};
+	
+	static constexpr EasyPinD::d_pin_t CAN2_SPI_CS = {GPIOB, GPIO_PIN_3};
 	static constexpr EasyPinD::d_pin_t CAN2_RX_INT = {GPIOB, GPIO_PIN_4};
 	static constexpr EasyPinD::d_pin_t CAN2_RS = {GPIOB, GPIO_PIN_8};
 	static constexpr EasyPinD::d_pin_t CAN2_SENS_PWR = {GPIOA, GPIO_PIN_4};
-
-
-
-
-
-
-
-
-
-
+	
+	
+	SteeringAngleSensor sensor1;
+	SteeringAngleSensor sensor2;
+	
+	
 	inline void SPI_Config(const SPIManagerInterface::spi_config_t &config)
 	{
 		if(hspi1.Init.BaudRatePrescaler == config.prescaler && hspi1.Init.FirstBit == config.first_bit) return;
@@ -55,118 +52,47 @@ namespace CAN_SPI
 		//HAL_SPI_TransmitReceive(&hspi1, tx_data, rx_data, length, 200);
 		HAL_SPI_WriteReadFast(&hspi1, tx_data, rx_data, length, 200);
 	}
-
-
-
-
-
-
-class SteeringAngleSensor
-{
-	static constexpr uint16_t PACKET_ID = 0x00C2;
-	static constexpr uint8_t PACKET_LENGTH = 7;
 	
-	public:
-
-		SteeringAngleSensor() : _last_count(255)
-		{}
-		
-		struct __attribute__((packed)) sensor_t
-		{
-			uint8_t crc;
-			uint8_t _null;
-			uint8_t counter : 4;
-			uint8_t error : 4;
-			int16_t roll;
-			int16_t angle;
-		};
-		
-		bool PutPacket(uint16_t id, uint8_t *raw, uint8_t length)
-		{
-			if(id != PACKET_ID) return false;
-			if(length != PACKET_LENGTH) return false;
-			
-			memcpy(_raw_array, raw, length);
-			_ReverseArray();
-			_FixParams();
-			
-			if(_obj->counter == _last_count) return false;
-			_last_count = _obj->counter;
-			
-			return true;
-		}
-
-		const sensor_t *data = (sensor_t *) _raw_array;
-
-	private:
-		
-		void _ReverseArray()
-		{
-			uint8_t i = 0;
-			uint8_t j = (PACKET_LENGTH - 1);
-			uint8_t temp;
-			while(i < j)
-			{
-				temp = _raw_array[i];
-				_raw_array[i] = _raw_array[j];
-				_raw_array[j] = temp;
-				
-				i++; j--;
-			}
-		}
-		
-		uint8_t _CalculateCRC()
-		{
-			uint8_t crc = 0xFF;
-			for(uint8_t i = 0; i < (PACKET_LENGTH - 1); ++i)
-			{
-				crc -= _raw_array[i];
-			}
-			return crc;
-		}
-
-		void _FixParams()
-		{
-			_obj->angle -= 0x8000;
-			_obj->roll -= 0x8000;
-			
-			return;
-		}
-		
-		uint8_t _last_count;
-		
-		uint8_t _raw_array[PACKET_LENGTH];
-		sensor_t *_obj = (sensor_t *) _raw_array;
-};
-
-
-
-
-
-
-
-
-
-	SteeringAngleSensor sensor1;
-	SteeringAngleSensor sensor2;
-
-
-	void CAN_RX(uint32_t address, uint8_t *data, uint8_t length)
+	
+	void CAN_RX(SteeringRack::rack_id_t id, uint32_t address, uint8_t *data, uint8_t length)
 	{
-		bool result = sensor1.PutPacket(address, data, length);
+
+		Leds::obj.SetOn(Leds::LED_WHITE);
+
+		SteeringAngleSensor *sensor = nullptr;
+		switch(id)
+		{
+			case SteeringRack::RACK_1:
+			{
+				sensor = &sensor1;
+
+				break;
+			}
+			case SteeringRack::RACK_2:
+			{
+				sensor = &sensor2;
+
+				break;
+			}
+		}
+		
+		uint32_t time = HAL_GetTick();
+		bool result = sensor->PutPacket(time, address, data, length);
 		if(result == true)
 		{
-			DEBUG_LOG_TOPIC("ExCAN RX", "Addr: %04X, angle:%+05d, roll: %+05d, err: %02d\n", address, sensor1.data->angle, sensor1.data->roll, sensor1.data->error);
+			DEBUG_LOG_TOPIC("ExCAN RX", "Port: %d, Addr: %04X, Angle: %+05d, Roll: %+05d, Err: %02d\n", id, address, sensor->data_int->angle, sensor->data_int->roll, sensor->data_int->error);
+			
+			SteeringRack::Tick( id, sensor->data_float->angle, sensor->data_float->roll, sensor->data_float->dt );
 		}
-		
-		//DEBUG_LOG_TOPIC("ExCAN RX", "Addr: %d, Data (%d): %02X %02X %02X %02X %02X %02X %02X %02X\n", address, length, data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+
+		Leds::obj.SetOff(Leds::LED_WHITE);
 	}
 	
 	
 	
 	SPIManager<2> manager(SPI_Config, SPI_Write, SPI_Read, SPI_WriteRead);
-	SPI_MCP2515 obj1(SPI_CS_CAN1, CAN1_RX_INT, SPI_BAUDRATEPRESCALER_8);
-	SPI_MCP2515 obj2(SPI_CS_CAN2, CAN2_RX_INT, SPI_BAUDRATEPRESCALER_8);
+	SPI_MCP2515 obj1(CAN1_SPI_CS, CAN1_RX_INT, SPI_BAUDRATEPRESCALER_8);
+	SPI_MCP2515 obj2(CAN2_SPI_CS, CAN2_RX_INT, SPI_BAUDRATEPRESCALER_8);
 	EasyPinD pin_rs_1(CAN1_RS.Port, {CAN1_RS.Pin, GPIO_MODE_OUTPUT_OD, GPIO_NOPULL, GPIO_SPEED_FREQ_HIGH}, GPIO_PIN_SET);
 	EasyPinD pin_sens_1(CAN1_SENS_PWR.Port, {CAN1_SENS_PWR.Pin, GPIO_MODE_OUTPUT_PP, GPIO_NOPULL, GPIO_SPEED_FREQ_HIGH}, GPIO_PIN_RESET);
 	EasyPinD pin_rs_2(CAN2_RS.Port, {CAN2_RS.Pin, GPIO_MODE_OUTPUT_OD, GPIO_NOPULL, GPIO_SPEED_FREQ_HIGH}, GPIO_PIN_SET);
@@ -185,8 +111,8 @@ class SteeringAngleSensor
 		manager.AddDevice(obj1);
 		manager.AddDevice(obj2);
 
-		obj1.begin(8000000, 500000, CAN_RX);
-		obj2.begin(8000000, 500000, CAN_RX);
+		obj1.begin(8000000, 500000, [](uint32_t address, uint8_t *data, uint8_t length){ CAN_RX(SteeringRack::RACK_1, address, data, length); });
+		obj2.begin(8000000, 500000, [](uint32_t address, uint8_t *data, uint8_t length){ CAN_RX(SteeringRack::RACK_2, address, data, length); });
 
 		pin_sens_1.On();
 		pin_sens_2.On();
