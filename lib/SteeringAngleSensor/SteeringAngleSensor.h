@@ -10,6 +10,9 @@ class SteeringAngleSensor
 {
 	static constexpr uint16_t PACKET_ID = 0x00C2;
 	static constexpr uint8_t PACKET_LENGTH = 7;
+
+	static constexpr uint32_t LOST_IDLE_TIME = 20;
+	using func_error_lost_t = void (*)();
 	
 	struct __attribute__((packed)) sensor_packet_t
 	{
@@ -29,20 +32,33 @@ class SteeringAngleSensor
 	};
 	
 	public:
+
+		enum error_t : uint8_t
+		{
+			ERROR_NONE,
+			ERROR_ID,
+			ERROR_LENGTH,
+			ERROR_CRC,
+			ERROR_ANGLE,
+			ERROR_ERR_SENSOR,
+			ERROR_COUNTER
+		};
+		
 		SteeringAngleSensor() : _last_time(0), _last_count(255)
 		{}
 		
-		bool PutPacket(uint32_t time, uint16_t id, uint8_t *raw, uint8_t length)
+		error_t PutPacket(uint32_t &time, uint16_t id, uint8_t *raw, uint8_t length)
 		{
-			if(id != PACKET_ID) return false;
-			if(length != PACKET_LENGTH) return false;
+			if(id != PACKET_ID) return ERROR_ID;
+			if(length != PACKET_LENGTH) return ERROR_LENGTH;
 			
 			reverse_memcpy(_raw_array, raw, length);
 			// Массив _raw_array кастится на объект _obj, поэтому можно сразу работать с объектом
 			
-			if(_CalculateCRC() != _obj->crc) return false;
-			if(_obj->error != 0) return false;
-			if(_obj->counter == _last_count) return false;
+			if(_CalculateCRC() != _obj->crc) return ERROR_CRC;
+			if(_obj->angle == 0xFFFF) return ERROR_ANGLE;
+			if(_obj->error != 0) return ERROR_ERR_SENSOR;
+			if(_obj->counter == _last_count) return ERROR_COUNTER;
 			
 			_obj->angle -= 0x8000;
 			_obj->roll -= 0x8000;
@@ -54,7 +70,19 @@ class SteeringAngleSensor
 			_last_time = time;
 			_last_count = _obj->counter;
 			
-			return true;
+			return ERROR_NONE;
+		}
+
+		void CheckLost(uint32_t &time, func_error_lost_t func_lost)
+		{
+			if(time - _last_time > LOST_IDLE_TIME)
+			{
+				_last_time = time;
+				
+				func_lost();
+			}
+
+			return;
 		}
 		
 		const sensor_packet_t *data_int = (sensor_packet_t *) _raw_array;

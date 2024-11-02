@@ -10,6 +10,9 @@ namespace SteeringRack
 	static constexpr uint16_t PWM_MID = 1500;
 	static constexpr uint16_t PWM_MAX = 2200;
 
+	static constexpr float PID_KP = 1.0f;
+	static constexpr float PID_KI = 0.1f;
+	static constexpr float PID_KD = 0.01f;
 
 
 	struct params_t
@@ -81,12 +84,11 @@ class SteeringControl
 		{
 			float pid_output = _pid.Calculate(_target, measured_value, dt);
 			uint16_t pwm = ((int32_t)(pid_output + 0.5f)) + (int32_t)_pwm_mid;
-
-			DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d;\n", pid_output, pwm);
+			uint16_t pwm_fix = clamp(pwm, _pwm_min, _pwm_max);
 			
-			if(pwm < _pwm_min && pwm > _pwm_max) pwm = _pwm_mid;		// ???????????????????????????????
+			DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d, val_fix: %d;\n", pid_output, pwm, pwm_fix);
 			
-			__HAL_TIM_SET_COMPARE(_htim, _channel, pwm);
+			__HAL_TIM_SET_COMPARE(_htim, _channel, pwm_fix);
 			
 			return;
 		}
@@ -112,8 +114,8 @@ class SteeringControl
 
 	SteeringControl steerings[] = 
 	{
-		{1.0f, 0.1f, 0.01f, PWM_MIN, PWM_MID, PWM_MAX, &htim4, TIM_CHANNEL_1},
-		{1.0f, 0.1f, 0.01f, PWM_MIN, PWM_MID, PWM_MAX, &htim4, TIM_CHANNEL_2}
+		{PID_KP, PID_KI, PID_KD, PWM_MIN, PWM_MID, PWM_MAX, &htim4, TIM_CHANNEL_1},
+		{PID_KP, PID_KI, PID_KD, PWM_MIN, PWM_MID, PWM_MAX, &htim4, TIM_CHANNEL_2}
 	};
 	
 	

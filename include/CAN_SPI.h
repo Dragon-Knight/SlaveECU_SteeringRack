@@ -77,12 +77,18 @@ namespace CAN_SPI
 		}
 		
 		uint32_t time = HAL_GetTick();
-		bool result = sensor->PutPacket(time, address, data, length);
-		if(result == true)
+		SteeringAngleSensor::error_t result = sensor->PutPacket(time, address, data, length);
+		if(result == SteeringAngleSensor::ERROR_NONE)
 		{
 			DEBUG_LOG_TOPIC("ExCAN RX", "Port: %d, Addr: %04X, Angle: %+05d, Roll: %+05d, Err: %02d\n", id, address, sensor->data_int->angle, sensor->data_int->roll, sensor->data_int->error);
 			
 			SteeringRack::Tick( id, sensor->data_float->angle, sensor->data_float->roll, sensor->data_float->dt );
+		}
+		else
+		{
+			DEBUG_LOG_TOPIC("ExCAN ERR", "Port: %d, Addr: %04X, Angle: %+05d, Roll: %+05d, Err: %02d\n", id, address, sensor->data_int->angle, sensor->data_int->roll, result);
+
+			Leds::obj.SetOn(Leds::LED_RED, 15);
 		}
 
 		Leds::obj.SetOff(Leds::LED_WHITE);
@@ -114,6 +120,7 @@ namespace CAN_SPI
 		obj1.begin(8000000, 500000, [](uint32_t address, uint8_t *data, uint8_t length){ CAN_RX(SteeringRack::RACK_1, address, data, length); });
 		obj2.begin(8000000, 500000, [](uint32_t address, uint8_t *data, uint8_t length){ CAN_RX(SteeringRack::RACK_2, address, data, length); });
 
+
 		pin_sens_1.On();
 		pin_sens_2.On();
 
@@ -124,6 +131,14 @@ namespace CAN_SPI
 	inline void Loop(uint32_t &current_time)
 	{
 		manager.Tick(current_time);
+		sensor1.CheckLost(current_time, [](){
+			DEBUG_LOG_TOPIC("ExCAN ERR", "Lost sensor 1\n");
+			Leds::obj.SetOn(Leds::LED_RED, 20);
+		});
+		sensor2.CheckLost(current_time, [](){
+			DEBUG_LOG_TOPIC("ExCAN ERR", "Lost sensor 2\n");
+			Leds::obj.SetOn(Leds::LED_RED, 20);
+		});
 		
 		/*
 		static uint32_t tick10 = 0;
