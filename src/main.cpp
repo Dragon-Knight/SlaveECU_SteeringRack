@@ -4,6 +4,7 @@
 #include "SPI.h"
 #include "About.h"
 #include "Leds.h"
+#include "Config.h"
 #include "CANLogic.h"
 #include "SteeringRack.h"
 #include "CAN_SPI.h"
@@ -11,6 +12,7 @@
 
 ADC_HandleTypeDef hadc1;
 CAN_HandleTypeDef hcan;
+CRC_HandleTypeDef hcrc;
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
 TIM_HandleTypeDef htim4;
@@ -19,6 +21,7 @@ UART_HandleTypeDef hDebugUart;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
+static void MX_CRC_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART1_UART_Init(void);
@@ -103,11 +106,13 @@ int main(void)
 	MX_USART1_UART_Init();
 	MX_ADC1_Init();
 	MX_TIM4_Init();
+	MX_CRC_Init();
 	
 	About::Setup();
 	Leds::Setup();
 	SPI::Setup();
 	CAN_SPI::Setup();
+	Config::Setup();
 	CANLib::Setup();
 	SteeringRack::Setup();
 	
@@ -123,6 +128,7 @@ int main(void)
 		Leds::Loop(current_time);
 		SPI::Loop(current_time);
 		CAN_SPI::Loop(current_time);
+		Config::Loop(current_time);
 		CANLib::Loop(current_time);
 		SteeringRack::Loop(current_time);
 	}
@@ -221,6 +227,15 @@ static void MX_CAN_Init(void)
 	sFilterConfig.FilterActivation = ENABLE;
 	// sFilterConfig.SlaveStartFilterBank = 14;
 	if(HAL_CAN_ConfigFilter(&hcan, &sFilterConfig) != HAL_OK)
+	{
+		Error_Handler();
+	}
+}
+
+static void MX_CRC_Init(void)
+{
+	hcrc.Instance = CRC;
+	if(HAL_CRC_Init(&hcrc) != HAL_OK)
 	{
 		Error_Handler();
 	}
