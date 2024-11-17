@@ -94,11 +94,6 @@ class SteeringControl
 		}
 		
 	private:
-
-		uint16_t _FastFuse(uint16_t pwm)
-		{
-
-		}
 		
 		uint16_t clamp(uint16_t value, uint16_t min, uint16_t max)
 		{

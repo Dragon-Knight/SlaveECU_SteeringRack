@@ -6,14 +6,14 @@ extern CRC_HandleTypeDef hcrc;
 
 namespace Config
 {
-	static constexpr uint16_t EEPROM_OFFSET = 0;
+	static constexpr uint16_t EEPROM_OFFSET_MAIN = 0;
 	static constexpr uint16_t DATA_SIZE = 256;
 	static constexpr uint16_t DATA_H_SIZE = 9;
 	static constexpr uint16_t DATA_PAGE_SIZE = SPI::eeprom.EEPROM_PAGE_SIZE;
-	static constexpr uint16_t EEPROM_OFFSET_MIRROR = DATA_SIZE + EEPROM_OFFSET;
+	static constexpr uint16_t EEPROM_OFFSET_MIRROR = DATA_SIZE + EEPROM_OFFSET_MAIN;
 	static constexpr uint32_t MIRROR_TIME_SYNC = 10 * 60 * 1000;
 	
-	static_assert(EEPROM_OFFSET % DATA_PAGE_SIZE == 0, "EEPROM_OFFSET must be a multiple of 32!");
+	static_assert(EEPROM_OFFSET_MAIN % DATA_PAGE_SIZE == 0, "EEPROM_OFFSET_MAIN must be a multiple of 32!");
 	
 	// Общая структура всего блока данных
 	struct __attribute__((packed)) eeprom_t
@@ -22,7 +22,7 @@ namespace Config
 		uint8_t verison = 0x01;
 		
 		// Счётчик записей в память
-		uint32_t counter = 0x00000000;
+		uint32_t counter = 0x00000001;
 		
 		// Блок полезных данных
 		eeprom_body_t body;
@@ -46,10 +46,10 @@ namespace Config
 		static uint8_t data[DATA_SIZE] = {0xFF};
 		
 		SPI::eeprom.ReadRaw(eeprom_offset, data);
-		
-		eeprom_t *data_obj = (eeprom_t *) data;
-		data_obj->counter++;
-		data_obj->crc32 = HAL_CRC_Calculate(&hcrc, (uint32_t *) data, ((sizeof(data) - 4) / 4));
+
+		// Обновляем метаданные
+		obj.counter++;
+		obj.crc32 = HAL_CRC_Calculate(&hcrc, (uint32_t *) data, ((sizeof(data) - 4) / 4));
 		
 		for(uint8_t page = 0; page < (DATA_SIZE / DATA_PAGE_SIZE); ++page)
 		{
@@ -68,19 +68,19 @@ namespace Config
 		uint32_t crc;
 		
 		// Начальная инициализацяи памяти, когда она или не инициализирована, или поменялась версия.
-		if(SPI::eeprom.ReadByte(EEPROM_OFFSET) != obj.verison)
+		if(SPI::eeprom.ReadByte(EEPROM_OFFSET_MAIN) != obj.verison)
 		{
 			// Считаем и заполняем CRC данных по умолчанию.
 			obj.crc32 = GetCRCObj();
 			
 			// Используем принудительную запись, чтобы гарантировать переписать все ячейки.
 			// Это удалить счётчики и прочии метаданные, но по хорошему это вызывается один раз при первом запуске платы.
-			SPI::eeprom.WriteRaw(EEPROM_OFFSET, obj);
+			SPI::eeprom.WriteRaw(EEPROM_OFFSET_MAIN, obj);
 			SPI::eeprom.WriteRaw(EEPROM_OFFSET_MIRROR, obj);
 		}
 		
 		// Читаем основной блок и проверяем CRC
-		SPI::eeprom.ReadRaw(EEPROM_OFFSET, obj);
+		SPI::eeprom.ReadRaw(EEPROM_OFFSET_MAIN, obj);
 		crc = GetCRCObj();
 		if(crc == obj.crc32) return;
 		
@@ -96,7 +96,7 @@ namespace Config
 	
 	void Dump()
 	{
-		Logger.Printf("EEPROM Dump(%d): ", DATA_SIZE);
+		Logger.Printf("EEPROM Dump(%d): ", SPI::eeprom.EEPROM_MEM_SIZE);
 		uint8_t data;
 		for(uint16_t i = 0; i < SPI::eeprom.EEPROM_MEM_SIZE; ++i)
 		{
@@ -144,7 +144,7 @@ namespace Config
 		{
 			last_save_time = current_time;
 			
-			CoolSave(EEPROM_OFFSET);
+			CoolSave(EEPROM_OFFSET_MAIN);
 		}
 		
 		current_time = HAL_GetTick();
