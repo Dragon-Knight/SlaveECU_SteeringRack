@@ -21,8 +21,13 @@ namespace CAN_SPI
 	static constexpr EasyPinD::d_pin_t CAN2_SENS_PWR = {GPIOA, GPIO_PIN_4};
 	
 	
-	SteeringAngleSensor sensor1;
-	SteeringAngleSensor sensor2;
+	
+	void OnSteeringAngleSensorError(uint8_t id, SteeringAngleSensorBase::error_t code);
+	
+	
+	
+	SteeringAngleSensor<SteeringRack::RACK_1> sensor1(OnSteeringAngleSensorError);
+	SteeringAngleSensor<SteeringRack::RACK_2> sensor2(OnSteeringAngleSensorError);
 	
 	
 	inline void SPI_Config(const SPIManagerInterface::spi_config_t &config)
@@ -56,42 +61,49 @@ namespace CAN_SPI
 	
 	void CAN_RX(SteeringRack::rack_id_t id, uint32_t address, uint8_t *data, uint8_t length)
 	{
-
-		Leds::obj.SetOn(Leds::LED_WHITE);
-
-		SteeringAngleSensor *sensor = nullptr;
+		bool result;
+		uint32_t time;
+		
 		switch(id)
 		{
 			case SteeringRack::RACK_1:
 			{
-				sensor = &sensor1;
+				time = HAL_GetTick();
+				
+				result = sensor1.PutPacket(time, address, data, length);
+				if(result == true)
+				{
+					// Если была ошибка, то в CAN'е окажется послденее валидное значение.
+					CANLib::obj_steering_angle.SetValue(0, sensor1.data_int->angle, CAN_TIMER_TYPE_NORMAL);
+					SteeringRack::Tick( id, sensor1.data_float->angle, sensor1.data_float->roll, sensor1.data_float->dt );
 
+					DEBUG_LOG_TOPIC("ExCAN RX", "Port: %d, Addr: %04X, Angle: %+05d, Roll: %+05d, Err: %02d\n", id, address, sensor1.data_int->angle, sensor1.data_int->roll, sensor1.data_int->error);
+				}
+				
 				break;
 			}
 			case SteeringRack::RACK_2:
 			{
-				sensor = &sensor2;
-
+				time = HAL_GetTick();
+				
+				result = sensor2.PutPacket(time, address, data, length);
+				if(result == true)
+				{
+					SteeringRack::Tick( id, sensor2.data_float->angle, sensor2.data_float->roll, sensor2.data_float->dt );
+				}
+				
 				break;
 			}
 		}
 		
-		uint32_t time = HAL_GetTick();
-		SteeringAngleSensor::error_t result = sensor->PutPacket(time, address, data, length);
-		if(result == SteeringAngleSensor::ERROR_NONE)
-		{
-			DEBUG_LOG_TOPIC("ExCAN RX", "Port: %d, Addr: %04X, Angle: %+05d, Roll: %+05d, Err: %02d\n", id, address, sensor->data_int->angle, sensor->data_int->roll, sensor->data_int->error);
-			
-			SteeringRack::Tick( id, sensor->data_float->angle, sensor->data_float->roll, sensor->data_float->dt );
-		}
-		else
-		{
-			DEBUG_LOG_TOPIC("ExCAN ERR", "Port: %d, Addr: %04X, Angle: %+05d, Roll: %+05d, Err: %02d\n", id, address, sensor->data_int->angle, sensor->data_int->roll, result);
-
-			Leds::obj.SetOn(Leds::LED_RED, 15);
-		}
-
-		Leds::obj.SetOff(Leds::LED_WHITE);
+		return;
+	}
+	
+	void OnSteeringAngleSensorError(uint8_t id, SteeringAngleSensorBase::error_t code)
+	{
+		Logger.Printf("Sensor %d: error code: %d", id, code).PrintNewLine();
+		
+		return;
 	}
 	
 	
@@ -131,6 +143,10 @@ namespace CAN_SPI
 	inline void Loop(uint32_t &current_time)
 	{
 		manager.Tick(current_time);
+		sensor1.Tick(current_time);
+		sensor2.Tick(current_time);
+
+		/*
 		sensor1.CheckLost(current_time, [](){
 			DEBUG_LOG_TOPIC("ExCAN ERR", "Lost sensor 1\n");
 			Leds::obj.SetOn(Leds::LED_RED, 20);
@@ -139,6 +155,7 @@ namespace CAN_SPI
 			DEBUG_LOG_TOPIC("ExCAN ERR", "Lost sensor 2\n");
 			Leds::obj.SetOn(Leds::LED_RED, 20);
 		});
+		*/
 		
 		/*
 		static uint32_t tick10 = 0;

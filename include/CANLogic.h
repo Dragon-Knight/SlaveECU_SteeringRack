@@ -7,7 +7,7 @@ extern void HAL_CAN_Send(uint16_t id, uint8_t *data_raw, uint8_t length_raw);
 
 namespace CANLib
 {
-	static constexpr uint8_t CFG_CANObjectsCount = 6;
+	static constexpr uint8_t CFG_CANObjectsCount = 7;
 	static constexpr uint8_t CFG_CANFrameBufferSize = 16;
 	static constexpr uint16_t CFG_CANFirstId = 0x01A0;
 	
@@ -22,6 +22,7 @@ namespace CANLib
 
 	CANObject<uint8_t,  1> obj_turn_mode(CFG_CANFirstId + 4);
 	CANObject<int16_t,  1> obj_target_angle(CFG_CANFirstId + 5);
+	CANObject<int16_t,  1> obj_steering_angle(CFG_CANFirstId + 6, 100);
 	
 	
 	void CAN_Enable()
@@ -60,6 +61,7 @@ namespace CANLib
 
 		can_manager.RegisterObject(obj_turn_mode);
 		can_manager.RegisterObject(obj_target_angle);
+		can_manager.RegisterObject(obj_steering_angle);
 		
 		// Передача версий и типов в объект block_info
 		obj_block_info.SetValue(0, (About::board_type << 3 | About::board_ver), CAN_TIMER_TYPE_NORMAL);

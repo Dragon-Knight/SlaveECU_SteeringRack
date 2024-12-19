@@ -1,87 +1,65 @@
 #pragma once
 #include <inttypes.h>
+#include "SteeringAngleSensorBase.h"
 
 /*
 	Класс работы с датчиком угла поворота руля.
 	Модель: 479452659R
 */
 
-class SteeringAngleSensor
+template <uint8_t _idx = 0> 
+class SteeringAngleSensor : public SteeringAngleSensorBase
 {
-	static constexpr uint16_t PACKET_ID = 0x00C2;
-	static constexpr uint8_t PACKET_LENGTH = 7;
-
-	static constexpr uint32_t LOST_IDLE_TIME = 20;
-	using func_error_lost_t = void (*)();
-	
-	struct __attribute__((packed)) sensor_packet_t
-	{
-		uint8_t crc;
-		uint8_t _null;
-		uint8_t counter : 4;
-		uint8_t error : 4;
-		int16_t roll;
-		int16_t angle;
-	};
-	
-	struct sensor_t
-	{
-		float angle;		// Улог поворота в гладусах
-		float roll;			// Скорость вращения в Драконах
-		float dt;			// Дельта пакетов в секундах
-	};
+	using callback_error_t = void (*)(uint8_t idx, error_t code);
 	
 	public:
-
-		enum error_t : uint8_t
-		{
-			ERROR_NONE,
-			ERROR_ID,
-			ERROR_LENGTH,
-			ERROR_CRC,
-			ERROR_ANGLE,
-			ERROR_ERR_SENSOR,
-			ERROR_COUNTER
-		};
 		
-		SteeringAngleSensor() : _last_time(0), _last_count(255)
+		SteeringAngleSensor(callback_error_t error) : 
+			_callback_error(error), _last_time(0), _last_count(255),
+			_error(ERROR_NONE), _error_last(ERROR_NONE)
 		{}
 		
-		error_t PutPacket(uint32_t &time, uint16_t id, uint8_t *raw, uint8_t length)
+		bool PutPacket(uint32_t &time, uint16_t id, uint8_t *raw, uint8_t length)
 		{
-			if(id != PACKET_ID) return ERROR_ID;
-			if(length != PACKET_LENGTH) return ERROR_LENGTH;
+			if(id != PACKET_ID){ _error = ERROR_ID; return false; }
+			if(length != PACKET_LENGTH){ _error = ERROR_LENGTH; return false; }
 			
 			reverse_memcpy(_raw_array, raw, length);
-			// Массив _raw_array кастится на объект _obj, поэтому можно сразу работать с объектом
+			// Массив _raw_array кастится на объект _raw_obj, поэтому можно сразу работать с объектом
 			
-			if(_CalculateCRC() != _obj->crc) return ERROR_CRC;
-			if(_obj->angle == 0xFFFF) return ERROR_ANGLE;
-			if(_obj->error != 0) return ERROR_ERR_SENSOR;
-			if(_obj->counter == _last_count) return ERROR_COUNTER;
+			if(_CalculateCRC() != _raw_obj->crc){ _error = ERROR_CRC; return false; }
+			if(_raw_obj->angle == 0xFFFF){ _error = ERROR_ANGLE; return false; }
+			if(_raw_obj->error != 0){ _error = ERROR_ERR_SENSOR; return false; }
+			if(_raw_obj->counter == _last_count){ _error = ERROR_COUNTER; return false; }
 			
-			_obj->angle -= 0x8000;
-			_obj->roll -= 0x8000;
+			_raw_obj->angle -= 0x8000;
+			_raw_obj->roll -= 0x8000;
 			
-			_sensor_data_float.angle = (float)_obj->angle / 10.0f;
-			_sensor_data_float.roll = (float)_obj->roll / 10.0f;
+			_sensor_data_float.angle = (float)_raw_obj->angle / 10.0f;
+			_sensor_data_float.roll = (float)_raw_obj->roll / 10.0f;
 			_sensor_data_float.dt = (float)(time - _last_time) / 1000.0f;
 			
 			_last_time = time;
-			_last_count = _obj->counter;
+			_last_count = _raw_obj->counter;
 			
-			return ERROR_NONE;
+			_error = ERROR_NONE;
+			return true;
 		}
-
-		void CheckLost(uint32_t &time, func_error_lost_t func_lost)
+		
+		void Tick(uint32_t &time)
 		{
 			if(time - _last_time > LOST_IDLE_TIME)
 			{
-				_last_time = time;
-				
-				func_lost();
+				_error = ERROR_LOST;
 			}
-
+			
+			if(_error != _error_last)
+			{
+				_error_last = _error;
+				
+				_callback_error(_idx, _error);
+			}
+			
 			return;
 		}
 		
@@ -110,10 +88,15 @@ class SteeringAngleSensor
 			return;
 		}
 		
+		callback_error_t _callback_error;
+		
 		uint32_t _last_time;
 		uint8_t _last_count;
 		
 		uint8_t _raw_array[PACKET_LENGTH];
-		sensor_packet_t *_obj = (sensor_packet_t *) _raw_array;
+		sensor_packet_t *_raw_obj = (sensor_packet_t *) _raw_array;
 		sensor_t _sensor_data_float;
+
+		error_t _error;
+		error_t _error_last;
 };

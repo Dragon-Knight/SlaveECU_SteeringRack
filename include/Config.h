@@ -19,7 +19,7 @@ namespace Config
 	struct __attribute__((packed)) eeprom_t
 	{
 		// Версия формата заголовка, а так-же флаг наличия записи в блоке (если 0x00 или 0xFF, то считаем что блок не инициализирован)
-		uint8_t verison = 0x01;
+		uint8_t verison = 0x02;
 		
 		// Счётчик записей в память
 		uint32_t counter = 0x00000001;
@@ -43,13 +43,13 @@ namespace Config
 	
 	void CoolSave(uint16_t eeprom_offset)
 	{
-		static uint8_t data[DATA_SIZE] = {0xFF};
+		static uint8_t data[DATA_SIZE] = {};
 		
 		SPI::eeprom.ReadRaw(eeprom_offset, data);
 
 		// Обновляем метаданные
 		obj.counter++;
-		obj.crc32 = HAL_CRC_Calculate(&hcrc, (uint32_t *) data, ((sizeof(data) - 4) / 4));
+		obj.crc32 = GetCRCObj();
 		
 		for(uint8_t page = 0; page < (DATA_SIZE / DATA_PAGE_SIZE); ++page)
 		{
@@ -91,6 +91,7 @@ namespace Config
 
 		//Если оба блока данных повреждены, то зависаем
 		Leds::obj.SetOn(Leds::LED_RED);
+		Logger.Printf("EEPROM read error!").PrintNewLine();
 		while(true){}
 	}
 	
@@ -121,6 +122,7 @@ namespace Config
 	
 	inline void Setup()
 	{
+		#warning fix it!
 		CoolLoad();
 		
 		

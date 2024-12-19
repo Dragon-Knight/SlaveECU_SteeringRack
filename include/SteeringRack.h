@@ -86,7 +86,7 @@ class SteeringControl
 			uint16_t pwm = ((int32_t)(pid_output + 0.5f)) + (int32_t)_pwm_mid;
 			uint16_t pwm_fix = clamp(pwm, _pwm_min, _pwm_max);
 			
-			DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d, val_fix: %d;\n", pid_output, pwm, pwm_fix);
+			//DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d, val_fix: %d;\n", pid_output, pwm, pwm_fix);
 			
 			__HAL_TIM_SET_COMPARE(_htim, _channel, pwm_fix);
 			
@@ -106,6 +106,32 @@ class SteeringControl
 		uint16_t _pwm_min, _pwm_mid, _pwm_max;
 		float _target;
 };
+
+
+
+
+
+
+	enum steering_mode_t : uint8_t
+	{
+		STEERING_MODE_NONE = 0,			// Полностью отключенное электронное управление поворотами
+		STEERING_MODE_STRAIGHT = 1,		// Задняя ось выравнивается в нулевое положение. Положение передней оси игнорируется
+		STEERING_MODE_REVERSE = 2,		// Задняя ось выравнивается на обратный угол относительно передней оси
+		STEERING_MODE_MIRROR = 3,		// Задняя ось выравнивается на тот же угол равный передней оси
+		STEERING_MODE_LOCK = 4,			// Задняя ось в режиме фиксации выставленного угла (устанавливается последнее фактическое значение задней оси)
+		STEERING_MODE_REMOTE = 128		// Режим удалённого управления
+	};
+
+	steering_mode_t mode = STEERING_MODE_NONE;
+
+
+
+
+
+
+
+
+
 
 	SteeringControl steerings[] = 
 	{
@@ -133,6 +159,14 @@ class SteeringControl
 	{
 		HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 		HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
+
+		CANLib::obj_turn_mode.RegisterFunctionSet([](can_frame_t &can_frame, can_error_t &error) -> can_result_t
+		{
+			mode = (steering_mode_t)can_frame.data[0];
+			
+			can_frame.function_id = CAN_FUNC_EVENT_OK;
+			return CAN_RESULT_CAN_FRAME;
+		});
 
 
 		return;
