@@ -73,8 +73,6 @@ namespace CAN_SPI
 				result = sensor1.PutPacket(time, address, data, length);
 				if(result == true)
 				{
-					// Если была ошибка, то в CAN'е окажется послденее валидное значение.
-					CANLib::obj_steering_angle.SetValue(0, sensor1.data_int->angle, CAN_TIMER_TYPE_NORMAL);
 					SteeringRack::Tick( id, sensor1.data_float->angle, sensor1.data_float->roll, sensor1.data_float->dt );
 
 					DEBUG_LOG_TOPIC("ExCAN RX", "Port: %d, Addr: %04X, Angle: %+05d, Roll: %+05d, Err: %02d\n", id, address, sensor1.data_int->angle, sensor1.data_int->roll, sensor1.data_int->error);

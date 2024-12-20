@@ -1,4 +1,5 @@
 #pragma once
+#include <CUtils.h>
 
 extern TIM_HandleTypeDef htim4;
 
@@ -15,10 +16,6 @@ namespace SteeringRack
 	static constexpr float PID_KD = 0.01f;
 
 
-	struct params_t
-	{
-		
-	};
 
 	enum rack_id_t : uint8_t { RACK_1 = 0, RACK_2 = 1 };
 
@@ -26,86 +23,54 @@ namespace SteeringRack
 
 
 
-class PIDController
-{
-	public:
-		
-		PIDController(float kp, float ki, float kd, float out_min, float out_max) : 
-			_kp(kp), _ki(ki), _kd(kd), _out_min(out_min), _out_max(out_max), _integral(0), _previous_error(0)
-		{}
-		
-		float Calculate(float setpoint, float measured_value, float dt)
-		{
-			float error = setpoint - measured_value;			// Вычисление ошибки
-			float derivative = (error - _previous_error) / dt;	// Производная часть
-			_integral += error * dt;							// Интегральная часть
-			_previous_error = error;
+
+
+
+
+
+
+	class SteeringControl
+	{
+		public:
+			SteeringControl(float p, float i, float d, uint16_t min_pwm, uint16_t mid_pwm, uint16_t max_pwm, TIM_HandleTypeDef *htim_pwm, uint32_t pwm_channel) : 
+				_pid(p, i, d, min_pwm, max_pwm), _htim(htim_pwm), _channel(pwm_channel), _pwm_min(min_pwm), _pwm_mid(mid_pwm), _pwm_max(max_pwm), 
+				_target(0.0f)
+			{}
+
+			void SetTarget(float target)
+			{
+				_target = target;
+
+				return;
+			}
 			
-			// Рассчитываем выход
-			float output = _kp * error + _ki * _integral + _kd * derivative;
+			// Функция для обновления ПИД и управления ШИМ
+			void Update(float measured_value, float dt)
+			{
+				float pid_output = _pid.Calculate(_target, measured_value, dt);
+				uint16_t pwm = ((int32_t)(pid_output + 0.5f)) + (int32_t)_pwm_mid;
+				uint16_t pwm_fix = clamp(pwm, _pwm_min, _pwm_max);
+				
+				//DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d, val_fix: %d;\n", pid_output, pwm, pwm_fix);
+				
+				__HAL_TIM_SET_COMPARE(_htim, _channel, pwm_fix);
+				
+				return;
+			}
 			
-			// Ограничиваем выход для ШИМ
-			//if(output > output_limit_max) output = output_limit_max;
-			//else if(output < output_limit_min) output = output_limit_min;
+		private:
 			
-			return output;
-		}
-		
-	private:
-		float _kp, _ki, _kd;		// Коэффициенты PID
-		float _out_min, _out_max;	// Лимиты для расчёта PID
-		float _integral;			// Накопление для интегральной части
-		float _previous_error;		// Предыдущее значение ошибки
-
-
-};
-
-
-
-
-
-class SteeringControl
-{
-	public:
-		SteeringControl(float p, float i, float d, uint16_t min_pwm, uint16_t mid_pwm, uint16_t max_pwm, TIM_HandleTypeDef *htim_pwm, uint32_t pwm_channel) : 
-			_pid(p, i, d, min_pwm, max_pwm), _htim(htim_pwm), _channel(pwm_channel), _pwm_min(min_pwm), _pwm_mid(mid_pwm), _pwm_max(max_pwm), 
-			_target(0.0f)
-		{}
-
-		void SetTarget(float target)
-		{
-			_target = target;
-
-			return;
-		}
-		
-		// Функция для обновления ПИД и управления ШИМ
-		void Update(float measured_value, float dt)
-		{
-			float pid_output = _pid.Calculate(_target, measured_value, dt);
-			uint16_t pwm = ((int32_t)(pid_output + 0.5f)) + (int32_t)_pwm_mid;
-			uint16_t pwm_fix = clamp(pwm, _pwm_min, _pwm_max);
+			uint16_t clamp(uint16_t value, uint16_t min, uint16_t max)
+			{
+				return (value < min) ? min : (value > max) ? max : value;
+			}
 			
-			//DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d, val_fix: %d;\n", pid_output, pwm, pwm_fix);
-			
-			__HAL_TIM_SET_COMPARE(_htim, _channel, pwm_fix);
-			
-			return;
-		}
-		
-	private:
-		
-		uint16_t clamp(uint16_t value, uint16_t min, uint16_t max)
-		{
-			return (value < min) ? min : (value > max) ? max : value;
-		}
-		
-		PIDController _pid;			// Экземпляр PID-контроллера
-		TIM_HandleTypeDef *_htim;	// Указатель на таймер для управления ШИМ
-		uint32_t _channel;			// Канал ШИМ
-		uint16_t _pwm_min, _pwm_mid, _pwm_max;
-		float _target;
-};
+			PIDController<float> _pid;			// Экземпляр PID-контроллера
+			TIM_HandleTypeDef *_htim;	// Указатель на таймер для управления ШИМ
+			uint32_t _channel;			// Канал ШИМ
+			uint16_t _pwm_min, _pwm_mid, _pwm_max;
+			float _target;
+	};
 
 
 
@@ -121,8 +86,9 @@ class SteeringControl
 		STEERING_MODE_LOCK = 4,			// Задняя ось в режиме фиксации выставленного угла (устанавливается последнее фактическое значение задней оси)
 		STEERING_MODE_REMOTE = 128		// Режим удалённого управления
 	};
-
+	
 	steering_mode_t mode = STEERING_MODE_NONE;
+	int16_t target = 0;
 
 
 
@@ -149,6 +115,11 @@ class SteeringControl
 	
 	void Tick(rack_id_t id, float angle, float roll, float dt)
 	{
+		if(id == RACK_1)
+		{
+			// Если была ошибка, то в CAN'е окажется послденее валидное значение.
+			CANLib::obj_steering_angle.SetValue(0, (angle * 10), CAN_TIMER_TYPE_NORMAL);
+		}
 		steerings[id].Update(angle, dt);
 		
 		return;
@@ -163,6 +134,14 @@ class SteeringControl
 		CANLib::obj_turn_mode.RegisterFunctionSet([](can_frame_t &can_frame, can_error_t &error) -> can_result_t
 		{
 			mode = (steering_mode_t)can_frame.data[0];
+			
+			can_frame.function_id = CAN_FUNC_EVENT_OK;
+			return CAN_RESULT_CAN_FRAME;
+		});
+		
+		CANLib::obj_target_angle.RegisterFunctionSet([](can_frame_t &can_frame, can_error_t &error) -> can_result_t
+		{
+			target = (can_frame.data[0] | (can_frame.data[1] << 8));
 			
 			can_frame.function_id = CAN_FUNC_EVENT_OK;
 			return CAN_RESULT_CAN_FRAME;
