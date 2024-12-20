@@ -17,7 +17,11 @@ namespace SteeringRack
 
 
 
-	enum rack_id_t : uint8_t { RACK_1 = 0, RACK_2 = 1 };
+	enum rack_id_t : uint8_t
+	{
+		RACK_1 = 0, 		// Передняя рейка
+		RACK_2 = 1,			// Задняя рейка
+	};
 
 
 
@@ -65,7 +69,7 @@ namespace SteeringRack
 				return (value < min) ? min : (value > max) ? max : value;
 			}
 			
-			PIDController<float> _pid;			// Экземпляр PID-контроллера
+			PIDController<float> _pid;	// Экземпляр PID-контроллера
 			TIM_HandleTypeDef *_htim;	// Указатель на таймер для управления ШИМ
 			uint32_t _channel;			// Канал ШИМ
 			uint16_t _pwm_min, _pwm_mid, _pwm_max;
@@ -88,7 +92,7 @@ namespace SteeringRack
 	};
 	
 	steering_mode_t mode = STEERING_MODE_NONE;
-	int16_t target = 0;
+	float target = 0.0f;
 
 
 
@@ -141,7 +145,7 @@ namespace SteeringRack
 		
 		CANLib::obj_target_angle.RegisterFunctionSet([](can_frame_t &can_frame, can_error_t &error) -> can_result_t
 		{
-			target = (can_frame.data[0] | (can_frame.data[1] << 8));
+			target = (float)(can_frame.data[0] | (can_frame.data[1] << 8)) / 10.0f;
 			
 			can_frame.function_id = CAN_FUNC_EVENT_OK;
 			return CAN_RESULT_CAN_FRAME;
