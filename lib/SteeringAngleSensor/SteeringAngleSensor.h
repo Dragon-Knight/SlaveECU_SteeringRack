@@ -1,5 +1,6 @@
 #pragma once
 #include <inttypes.h>
+#include <CUtils.h>
 #include "SteeringAngleSensorBase.h"
 
 /*
@@ -7,24 +8,24 @@
 	Модель: 479452659R
 */
 
-template <uint8_t _idx = 0> 
 class SteeringAngleSensor : public SteeringAngleSensorBase
 {
 	using callback_error_t = void (*)(uint8_t idx, error_t code);
 	
 	public:
 		
-		SteeringAngleSensor(callback_error_t error) : 
-			_callback_error(error), _last_time(0), _last_count(255),
+		SteeringAngleSensor(uint8_t idx, callback_error_t error) : 
+			_idx(idx), _callback_error(error), 
+			_last_time(0), _last_count(255), 
 			_error(ERROR_NONE), _error_last(ERROR_NONE)
 		{}
-		
+
 		bool PutPacket(uint32_t &time, uint16_t id, uint8_t *raw, uint8_t length)
 		{
 			if(id != PACKET_ID){ _error = ERROR_ID; return false; }
 			if(length != PACKET_LENGTH){ _error = ERROR_LENGTH; return false; }
 			
-			reverse_memcpy(_raw_array, raw, length);
+			memcpy_reverse(_raw_array, raw, length);
 			// Массив _raw_array кастится на объект _raw_obj, поэтому можно сразу работать с объектом
 			
 			if(_CalculateCRC() != _raw_obj->crc){ _error = ERROR_CRC; return false; }
@@ -77,17 +78,7 @@ class SteeringAngleSensor : public SteeringAngleSensorBase
 			return crc;
 		}
 		
-		void reverse_memcpy(uint8_t *dest, const uint8_t *src, uint16_t len)
-		{
-			if(len == 0) return;
-			
-			const uint8_t *src_end = src + len - 1;
-			while(len--)
-				*dest++ = *src_end--;
-
-			return;
-		}
-		
+		uint8_t _idx;
 		callback_error_t _callback_error;
 		
 		uint32_t _last_time;

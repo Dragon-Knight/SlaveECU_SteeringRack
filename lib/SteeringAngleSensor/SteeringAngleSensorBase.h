@@ -3,10 +3,6 @@
 
 class SteeringAngleSensorBase
 {
-	static constexpr uint16_t PACKET_ID = 0x00C2;
-	static constexpr uint8_t PACKET_LENGTH = 7;
-	static constexpr uint32_t LOST_IDLE_TIME = 50;
-	
 	public:
 		
 		enum error_t : uint8_t
@@ -23,6 +19,10 @@ class SteeringAngleSensorBase
 
 	protected:
 		
+		static constexpr uint16_t PACKET_ID = 0x00C2;
+		static constexpr uint8_t PACKET_LENGTH = 7;
+		static constexpr uint32_t LOST_IDLE_TIME = 50;
+
 		// Сырой CAN пакет данных от датчика в обратном порядке байт
 		struct __attribute__((packed)) sensor_packet_t
 		{
