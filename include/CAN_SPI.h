@@ -100,7 +100,7 @@ namespace CAN_SPI
 	void OnSteeringAngleSensorError(uint8_t id, SteeringAngleSensorBase::error_t code)
 	{
 		Logger.Printf("Sensor %d: error code: %d", id, code).PrintNewLine();
-		
+		SteeringRack::OnErrorSensor(id, code);
 		return;
 	}
 	
