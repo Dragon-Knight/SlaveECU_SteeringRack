@@ -15,6 +15,8 @@ namespace SteeringRack
 	static constexpr float PID_KI = 0.1f;
 	static constexpr float PID_KD = 0.01f;
 
+	static constexpr float ANGLE_MID = 0.0f;
+
 
 
 	enum rack_id_t : uint8_t
@@ -38,7 +40,7 @@ namespace SteeringRack
 		public:
 			SteeringControl(float p, float i, float d, uint16_t min_pwm, uint16_t mid_pwm, uint16_t max_pwm, TIM_HandleTypeDef *htim_pwm, uint32_t pwm_channel) : 
 				_pid(p, i, d, min_pwm, max_pwm), _htim(htim_pwm), _channel(pwm_channel), _pwm_min(min_pwm), _pwm_mid(mid_pwm), _pwm_max(max_pwm), 
-				_target(0.0f)
+				_target(0.0f), _isStopedPWM(true)
 			{}
 
 			void SetTarget(float target)
@@ -47,16 +49,29 @@ namespace SteeringRack
 
 				return;
 			}
+
+			void SetStopPWM()
+			{
+				_isStopedPWM = true;
+				__HAL_TIM_SET_COMPARE(_htim, _channel, 0);
+			}
+
+			void SetStartPWM()
+			{
+				_isStopedPWM = false;
+			}
 			
 			// Функция для обновления ПИД и управления ШИМ
 			void Update(float measured_value, float dt)
 			{
+				if(_isStopedPWM)
+					return;
+
 				float pid_output = _pid.Calculate(_target, measured_value, dt);
 				uint16_t pwm = ((int32_t)(pid_output + 0.5f)) + (int32_t)_pwm_mid;
 				uint16_t pwm_fix = clamp(pwm, _pwm_min, _pwm_max);
 				
 				//DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d, val_fix: %d;\n", pid_output, pwm, pwm_fix);
-				
 				__HAL_TIM_SET_COMPARE(_htim, _channel, pwm_fix);
 				
 				return;
@@ -74,6 +89,7 @@ namespace SteeringRack
 			uint32_t _channel;			// Канал ШИМ
 			uint16_t _pwm_min, _pwm_mid, _pwm_max;
 			float _target;
+			bool _isStopedPWM;
 	};
 
 
@@ -94,7 +110,13 @@ namespace SteeringRack
 	steering_mode_t mode = STEERING_MODE_NONE;
 	float target = 0.0f;
 
+	float prevAngleMasterOnModeChange = 0.0f;
 
+	float angleMaster = 0.0f;
+	float angleSlave = 0.0f;
+
+	bool isSensorsCalculated = false;
+	SteeringAngleSensorBase::error_t lastSensorErrorCode = SteeringAngleSensorBase::ERROR_NONE;
 
 
 
@@ -117,18 +139,87 @@ namespace SteeringRack
 		return;
 	}
 	
+	//получение актуального значения с датчиков
 	void Tick(rack_id_t id, float angle, float roll, float dt)
 	{
 		if(id == RACK_1)
 		{
 			// Если была ошибка, то в CAN'е окажется послденее валидное значение.
 			CANLib::obj_steering_angle.SetValue(0, (angle * 10), CAN_TIMER_TYPE_NORMAL);
+			angleMaster = angle;
+		}else
+		{
+			angleSlave = angle;
 		}
 		steerings[id].Update(angle, dt);
+		isSensorsCalculated = true;
 		
 		return;
 	}
 	
+	void OnErrorSensor (uint8_t id, SteeringAngleSensorBase::error_t code)
+	{
+		if (code > 0)
+		{
+			lastSensorErrorCode = code;
+			OnChangeMode(STEERING_MODE_NONE);
+
+		}
+		else
+		{
+			if (lastSensorErrorCode == SteeringAngleSensorBase::ERROR_LOST)
+			{
+				OnChangeMode(STEERING_MODE_NONE);
+			}
+			else
+			{
+				OnChangeMode(mode);
+			}
+		}
+	}
+
+	void OnChangeMode(steering_mode_t mode)
+	{
+		prevAngleMasterOnModeChange = angleMaster;
+		switch (mode)
+		{
+			case STEERING_MODE_NONE:
+				//выключить шим
+				steerings[RACK_1].SetStopPWM();
+				steerings[RACK_2].SetStopPWM();
+			break;
+			case STEERING_MODE_STRAIGHT:
+				steerings[RACK_1].SetStopPWM();
+				steerings[RACK_2].SetStartPWM();
+				steerings[RACK_2].SetTarget(0);
+			break;
+			case STEERING_MODE_REVERSE:
+				steerings[RACK_1].SetStopPWM();
+				steerings[RACK_2].SetStartPWM();
+				steerings[RACK_2].SetTarget(ANGLE_MID - angleMaster);
+			break;
+			case STEERING_MODE_MIRROR:
+				steerings[RACK_1].SetStopPWM();
+				steerings[RACK_2].SetStartPWM();
+				steerings[RACK_2].SetTarget(angleMaster);
+			break;
+			case STEERING_MODE_LOCK:
+
+				steerings[RACK_1].SetStopPWM();
+				steerings[RACK_2].SetStartPWM();
+				steerings[RACK_2].SetTarget(prevAngleMasterOnModeChange);
+			break;
+			case STEERING_MODE_REMOTE:
+			//пока не управляем
+				steerings[RACK_1].SetStopPWM();
+				steerings[RACK_2].SetStopPWM();
+			break;
+			default:
+				steerings[RACK_1].SetStopPWM();
+				steerings[RACK_2].SetStopPWM();
+			break;
+		}		
+	}
 	
 	inline void Setup()
 	{
@@ -139,6 +230,8 @@ namespace SteeringRack
 		{
 			mode = (steering_mode_t)can_frame.data[0];
 			
+			OnChangeMode(mode);
+
 			can_frame.function_id = CAN_FUNC_EVENT_OK;
 			return CAN_RESULT_CAN_FRAME;
 		});
@@ -157,8 +250,36 @@ namespace SteeringRack
 	
 	inline void Loop(uint32_t &current_time)
 	{
-		
-		
+		if (isSensorsCalculated)
+		{
+			switch (mode)
+			{
+				case STEERING_MODE_NONE:
+
+				break;
+				case STEERING_MODE_STRAIGHT:
+
+				break;
+				case STEERING_MODE_REVERSE:
+					steerings[RACK_2].SetTarget(ANGLE_MID - angleMaster);
+				break;
+				case STEERING_MODE_MIRROR:
+					steerings[RACK_2].SetTarget(angleMaster);
+				break;
+				case STEERING_MODE_LOCK:
+				
+				break;
+				case STEERING_MODE_REMOTE:
+
+				break;
+				default:
+					steerings[RACK_1].SetStopPWM();
+					steerings[RACK_2].SetStopPWM();				
+				break;
+			}
+			isSensorsCalculated = false;
+		}
+
 		current_time = HAL_GetTick();
 		return;
 	}
