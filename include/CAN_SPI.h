@@ -73,7 +73,7 @@ namespace CAN_SPI
 				result = sensor1.PutPacket(time, address, data, length);
 				if(result == true)
 				{
-					SteeringRack::Tick( id, sensor1.data_float->angle, sensor1.data_float->roll, sensor1.data_float->dt );
+					SteeringRack::OnDataSensor( id, sensor1.data_float->angle, sensor1.data_float->roll, sensor1.data_float->dt );
 
 					DEBUG_LOG_TOPIC("ExCAN RX", "Port: %d, Addr: %04X, Angle: %+05d, Roll: %+05d, Err: %02d\n", id, address, sensor1.data_int->angle, sensor1.data_int->roll, sensor1.data_int->error);
 				}
@@ -87,7 +87,7 @@ namespace CAN_SPI
 				result = sensor2.PutPacket(time, address, data, length);
 				if(result == true)
 				{
-					SteeringRack::Tick( id, sensor2.data_float->angle, sensor2.data_float->roll, sensor2.data_float->dt );
+					SteeringRack::OnDataSensor( id, sensor2.data_float->angle, sensor2.data_float->roll, sensor2.data_float->dt );
 				}
 				
 				break;
@@ -100,7 +100,8 @@ namespace CAN_SPI
 	void OnSteeringAngleSensorError(uint8_t id, SteeringAngleSensorBase::error_t code)
 	{
 		Logger.Printf("Sensor %d: error code: %d", id, code).PrintNewLine();
-		SteeringRack::OnErrorSensor(id, code);
+		SteeringRack::OnErrorSensor((SteeringRack::rack_id_t)id, code);
+		
 		return;
 	}
 	
