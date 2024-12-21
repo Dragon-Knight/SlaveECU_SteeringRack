@@ -1,5 +1,6 @@
 #pragma once
 #include <CUtils.h>
+#include "SteeringAngleSensorBase.h"
 
 extern TIM_HandleTypeDef htim4;
 
@@ -17,7 +18,7 @@ namespace SteeringRack
 
 	static constexpr float ANGLE_MID = 0.0f;
 
-
+	
 
 	enum rack_id_t : uint8_t
 	{
@@ -119,7 +120,7 @@ namespace SteeringRack
 	SteeringAngleSensorBase::error_t lastSensorErrorCode = SteeringAngleSensorBase::ERROR_NONE;
 
 
-
+	void OnChangeMode(steering_mode_t mode);
 
 
 
