@@ -22,29 +22,10 @@ class SteeringAngleSensor : public SteeringAngleSensorBase
 
 		bool PutPacket(uint32_t &time, uint16_t id, uint8_t *raw, uint8_t length)
 		{
-			if(id != PACKET_ID){ _error = ERROR_ID; return false; }
-			if(length != PACKET_LENGTH){ _error = ERROR_LENGTH; return false; }
+			_error = _CheckPacket(id, raw, length);
+			if(_error != ERROR_NONE) return false;
 			
-			memcpy_reverse(_raw_array, raw, length);
-			// Массив _raw_array кастится на объект _raw_obj, поэтому можно сразу работать с объектом
-			
-			if(_CalculateCRC() != _raw_obj->crc){ _error = ERROR_CRC; return false; }
-			if(_raw_obj->angle == 0xFFFF){ _error = ERROR_ANGLE; return false; }
-			if(_raw_obj->error != 0){ _error = ERROR_ERR_SENSOR; return false; }
-			if(_raw_obj->counter == _last_count){ _error = ERROR_COUNTER; return false; }
-			
-			_raw_obj->angle -= 0x8000;
-			_raw_obj->roll -= 0x8000;
-			
-			_sensor_data_float.angle = (float)_raw_obj->angle / 10.0f;
-			_sensor_data_float.roll = (float)_raw_obj->roll / 10.0f;
-			_sensor_data_float.dt = (float)(time - _last_time) / 1000.0f;
-			
-			_last_time = time;
-			_last_count = _raw_obj->counter;
-			
-			_error = ERROR_NONE;
-			return true;
+			return _Parse(time);
 		}
 		
 		void Tick(uint32_t &time)
@@ -68,6 +49,38 @@ class SteeringAngleSensor : public SteeringAngleSensorBase
 		const sensor_t *data_float = (sensor_t *) &_sensor_data_float;
 		
 	private:
+		
+		error_t _CheckPacket(uint16_t id, uint8_t *raw, uint8_t length)
+		{
+			if(id != PACKET_ID) return ERROR_ID;
+			if(length != PACKET_LENGTH) return ERROR_LENGTH;
+			
+			memcpy_reverse(_raw_array, raw, length);
+			// Массив _raw_array кастится на объект _raw_obj, поэтому можно сразу работать с объектом
+
+			if(_CalculateCRC() != _raw_obj->crc) return ERROR_CRC;
+			if(_raw_obj->angle == 0xFFFF) return ERROR_ANGLE;
+			if(_raw_obj->error != 0) return ERROR_ERR_SENSOR;
+			if(_raw_obj->counter == _last_count) return ERROR_COUNTER;
+			
+			return ERROR_NONE;
+		}
+
+		bool _Parse(uint32_t &time)
+		{
+			_raw_obj->angle -= 0x8000;
+			_raw_obj->roll -= 0x8000;
+
+			_sensor_data_float.angle = (float)_raw_obj->angle / 10.0f;
+			_sensor_data_float.roll = (float)_raw_obj->roll / 10.0f;
+			_sensor_data_float.dt = (float)(time - _last_time) / 1000.0f;
+
+			_last_time = time;
+			_last_count = _raw_obj->counter;
+
+			return true;
+		}
+		
 		uint8_t _CalculateCRC()
 		{
 			uint8_t crc = 0xFF;
