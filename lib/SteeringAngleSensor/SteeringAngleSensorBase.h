@@ -22,6 +22,7 @@ class SteeringAngleSensorBase
 		static constexpr uint16_t PACKET_ID = 0x00C2;
 		static constexpr uint8_t PACKET_LENGTH = 7;
 		static constexpr uint32_t LOST_IDLE_TIME = 50;
+		static constexpr uint32_t LOST_START_TIME = LOST_IDLE_TIME * 30;
 
 		// Сырой CAN пакет данных от датчика в обратном порядке байт
 		struct __attribute__((packed)) sensor_packet_t

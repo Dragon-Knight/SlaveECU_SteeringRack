@@ -16,7 +16,7 @@ class SteeringAngleSensor : public SteeringAngleSensorBase
 		
 		SteeringAngleSensor(uint8_t idx, callback_error_t error) : 
 			_idx(idx), _callback_error(error), 
-			_last_time(0), _last_count(255), 
+			_last_time(0), _last_count(255), _lost_timeout(LOST_START_TIME),
 			_error(ERROR_NONE), _error_last(ERROR_NONE)
 		{}
 
@@ -24,13 +24,15 @@ class SteeringAngleSensor : public SteeringAngleSensorBase
 		{
 			_error = _CheckPacket(id, raw, length);
 			if(_error != ERROR_NONE) return false;
+
+			_lost_timeout = LOST_IDLE_TIME;
 			
 			return _Parse(time);
 		}
 		
 		void Tick(uint32_t &time)
 		{
-			if(time - _last_time > LOST_IDLE_TIME)
+			if(time - _last_time > _lost_timeout)
 			{
 				_error = ERROR_LOST;
 			}
@@ -100,6 +102,7 @@ class SteeringAngleSensor : public SteeringAngleSensorBase
 		uint8_t _raw_array[PACKET_LENGTH];
 		sensor_packet_t *_raw_obj = (sensor_packet_t *) _raw_array;
 		sensor_t _sensor_data_float;
+		uint32_t _lost_timeout;
 
 		error_t _error;
 		error_t _error_last;
