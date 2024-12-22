@@ -47,7 +47,7 @@ namespace SteeringRack
 	bool isSensorsCalculated = false;
 	SteeringAngleSensorBase::error_t lastSensorErrorCode = SteeringAngleSensorBase::ERROR_NONE;
 
-	SteeringControl steerings[] = 
+	SteeringPWMControl steerings[] = 
 	{
 		{PID_KP, PID_KI, PID_KD, PWM_MIN, PWM_MID, PWM_MAX, &htim4, TIM_CHANNEL_1},
 		{PID_KP, PID_KI, PID_KD, PWM_MIN, PWM_MID, PWM_MAX, &htim4, TIM_CHANNEL_2}
@@ -67,12 +67,16 @@ namespace SteeringRack
 			// Если была ошибка, то в CAN'е окажется послденее валидное значение.
 			CANLib::obj_steering_angle.SetValue(0, (angle * 10), CAN_TIMER_TYPE_NORMAL);
 			angleMaster = angle;
+			steerings[RACK_2].Update(angle, dt);
 		}else
 		{
 			angleSlave = angle;
+
+			steerings[RACK_1].Update(angle, dt);
 		}
-		steerings[id].Update(angle, dt);
+		//steerings[id].Update(angle, dt);
 		isSensorsCalculated = true;
+
 		
 		return;
 	}
@@ -107,45 +111,53 @@ namespace SteeringRack
 		switch(mode)
 		{
 			case STEERING_MODE_NONE:
+			{
 				//выключить шим
 				steerings[RACK_1].SetStopPWM();
 				steerings[RACK_2].SetStopPWM();
 				break;
-			
+			}
 			case STEERING_MODE_STRAIGHT:
+			{
 				steerings[RACK_1].SetStopPWM();
 				steerings[RACK_2].SetStartPWM();
 				steerings[RACK_2].SetTarget(ANGLE_MID);
 				break;
-			
+			}
 			case STEERING_MODE_REVERSE:
+			{
 				steerings[RACK_1].SetStopPWM();
 				steerings[RACK_2].SetStartPWM();
 				steerings[RACK_2].SetTarget(ANGLE_MID - angleMaster);
 				break;
-			
+			}
 			case STEERING_MODE_MIRROR:
+			{
 				steerings[RACK_1].SetStopPWM();
 				steerings[RACK_2].SetStartPWM();
 				steerings[RACK_2].SetTarget(angleMaster);
 				break;
-			
+			}
 			case STEERING_MODE_LOCK:
+			{
 				steerings[RACK_1].SetStopPWM();
 				steerings[RACK_2].SetStartPWM();
 				steerings[RACK_2].SetTarget(angleMaster);
 				break;
-			
+			}
 			case STEERING_MODE_REMOTE:
+			{
 				//пока не управляем
 				steerings[RACK_1].SetStopPWM();
 				steerings[RACK_2].SetStopPWM();
 				break;
-			
+			}
 			default:
+			{
 				steerings[RACK_1].SetStopPWM();
 				steerings[RACK_2].SetStopPWM();
 				break;
+			}
 		}
 		
 		return;
@@ -198,29 +210,37 @@ namespace SteeringRack
 			switch (mode)
 			{
 				case STEERING_MODE_NONE:
+				{
 					break;
-				
+				}
 				case STEERING_MODE_STRAIGHT:
+				{
 					break;
-				
+				}
 				case STEERING_MODE_REVERSE:
+				{
 					steerings[RACK_2].SetTarget(ANGLE_MID - angleMaster);
 					break;
-				
+				}
 				case STEERING_MODE_MIRROR:
+				{
 					steerings[RACK_2].SetTarget(angleMaster);
 					break;
-				
+				}
 				case STEERING_MODE_LOCK:
+				{
 					break;
-				
+				}
 				case STEERING_MODE_REMOTE:
+				{
 					break;
-				
+				}
 				default:
+				{
 					steerings[RACK_1].SetStopPWM();
 					steerings[RACK_2].SetStopPWM();				
 					break;
+				}
 			}
 		}
 		

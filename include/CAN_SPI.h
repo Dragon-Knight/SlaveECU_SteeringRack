@@ -75,7 +75,7 @@ namespace CAN_SPI
 				{
 					SteeringRack::OnDataSensor( id, sensor1.data_float->angle, sensor1.data_float->roll, sensor1.data_float->dt );
 
-					DEBUG_LOG_TOPIC("ExCAN RX", "Port: %d, Addr: %04X, Angle: %+05d, Roll: %+05d, Err: %02d\n", id, address, sensor1.data_int->angle, sensor1.data_int->roll, sensor1.data_int->error);
+					//DEBUG_LOG_TOPIC("ExCAN RX", "Port: %d, Addr: %04X, Angle: %+05d, Roll: %+05d, Err: %02d\n", id, address, sensor1.data_int->angle, sensor1.data_int->roll, sensor1.data_int->error);
 				}
 				
 				break;
