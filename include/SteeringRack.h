@@ -1,5 +1,5 @@
 #pragma once
-#include "SteeringControlClass.h"
+#include "SteeringPWMControlClass.h"
 #include "SteeringAngleSensorBase.h"
 
 extern TIM_HandleTypeDef htim4;
@@ -66,15 +66,12 @@ namespace SteeringRack
 		{
 			// Если была ошибка, то в CAN'е окажется послденее валидное значение.
 			CANLib::obj_steering_angle.SetValue(0, (angle * 10), CAN_TIMER_TYPE_NORMAL);
+			
 			angleMaster = angle;
-			steerings[RACK_2].Update(angle, dt);
-		}else
-		{
+		} else {
 			angleSlave = angle;
-
-			steerings[RACK_1].Update(angle, dt);
 		}
-		//steerings[id].Update(angle, dt);
+		steerings[id].Update(angle, dt);
 		isSensorsCalculated = true;
 
 		
@@ -92,7 +89,7 @@ namespace SteeringRack
 		}
 		else
 		{
-			if (lastSensorErrorCode == SteeringAngleSensorBase::ERROR_LOST)
+			if(lastSensorErrorCode == SteeringAngleSensorBase::ERROR_LOST)
 			{
 				OnChangeMode(STEERING_MODE_NONE);
 			}

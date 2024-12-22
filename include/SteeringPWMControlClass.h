@@ -22,7 +22,6 @@ class SteeringPWMControl
 		
 		void SetStopPWM()
 		{
-			DEBUG_LOG_TOPIC("SetStopPWM", "SetStopPWM-in : %d\n", _channel);
 			_isStopedPWM = true;
 			__HAL_TIM_SET_COMPARE(_htim, _channel, PWM_OFF_VALUE);
 			
@@ -31,7 +30,6 @@ class SteeringPWMControl
 		
 		void SetStartPWM()
 		{
-			DEBUG_LOG_TOPIC("SetStartPWM", "SetStartPWM-in : %d\n", _channel);
 			_isStopedPWM = false;
 			
 			return;
@@ -39,14 +37,13 @@ class SteeringPWMControl
 		
 		void Update(float measured_value, float dt)
 		{
-			DEBUG_LOG_TOPIC("Update", "Update-in : %d\n", _channel);
 			if(_isStopedPWM == true) return;
 			
 			float pid_output = _pid.Calculate(_target, measured_value, dt);
 			uint16_t pwm = ((int32_t)(pid_output + 0.5f)) + (int32_t)_pwm_mid;
 			uint16_t pwm_fix = clamp<uint16_t>(pwm, _pwm_min, _pwm_max);
 			
-			DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d, val_fix: %d;\n", pid_output, pwm, pwm_fix);
+			//DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d, val_fix: %d;\n", pid_output, pwm, pwm_fix);
 			__HAL_TIM_SET_COMPARE(_htim, _channel, pwm_fix);
 			
 			return;
