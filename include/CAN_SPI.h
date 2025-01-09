@@ -26,8 +26,8 @@ namespace CAN_SPI
 	
 	
 	
-	SteeringAngleSensor sensor1(SteeringRack::RACK_1, OnSteeringAngleSensorError);
-	SteeringAngleSensor sensor2(SteeringRack::RACK_2, OnSteeringAngleSensorError);
+	SteeringAngleSensor<false, 0> sensor1(SteeringRack::RACK_1, OnSteeringAngleSensorError);
+	SteeringAngleSensor<true, 0> sensor2(SteeringRack::RACK_2, OnSteeringAngleSensorError);
 	
 	
 	inline void SPI_Config(const SPIManagerInterface::spi_config_t &config)
@@ -87,7 +87,7 @@ namespace CAN_SPI
 				result = sensor2.PutPacket(time, address, data, length);
 				if(result == true)
 				{
-					SteeringRack::OnDataSensor( id, (0.0 - sensor2.data_float->angle), sensor2.data_float->roll, sensor2.data_float->dt );
+					SteeringRack::OnDataSensor( id, sensor2.data_float->angle, sensor2.data_float->roll, sensor2.data_float->dt );
 				}
 				
 				break;

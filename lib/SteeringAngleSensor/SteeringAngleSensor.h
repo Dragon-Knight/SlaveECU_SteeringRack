@@ -8,6 +8,7 @@
 	Модель: 479452659R
 */
 
+template <int16_t _angle_offset, bool _angle_invert> 
 class SteeringAngleSensor : public SteeringAngleSensorBase
 {
 	using callback_error_t = void (*)(uint8_t idx, error_t code);
@@ -72,7 +73,11 @@ class SteeringAngleSensor : public SteeringAngleSensorBase
 		{
 			_raw_obj->angle -= 0x8000;
 			_raw_obj->roll -= 0x8000;
-
+			
+			_raw_obj->angle += _angle_offset;
+			if(_angle_invert == true)
+				_raw_obj->angle = 0 - _raw_obj->angle;
+			
 			_sensor_data_float.angle = (float)_raw_obj->angle / 10.0f;
 			_sensor_data_float.roll = (float)_raw_obj->roll / 10.0f;
 			_sensor_data_float.dt = (float)(time - _last_time) / 1000.0f;
