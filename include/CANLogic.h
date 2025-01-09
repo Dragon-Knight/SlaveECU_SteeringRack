@@ -22,7 +22,8 @@ namespace CANLib
 
 	CANObject<uint8_t,  1> obj_turn_mode(CFG_CANFirstId + 4);
 	CANObject<int16_t,  1> obj_target_angle(CFG_CANFirstId + 5);
-	CANObject<int16_t,  1> obj_steering_angle(CFG_CANFirstId + 6, 100);
+	CANObject<int16_t,  1> obj_steering_angle_front(CFG_CANFirstId + 6, 100);
+	CANObject<int16_t,  1> obj_steering_angle_real(CFG_CANFirstId + 7, 100);
 	
 	
 	void CAN_Enable()
@@ -61,7 +62,8 @@ namespace CANLib
 
 		can_manager.RegisterObject(obj_turn_mode);
 		can_manager.RegisterObject(obj_target_angle);
-		can_manager.RegisterObject(obj_steering_angle);
+		can_manager.RegisterObject(obj_steering_angle_front);
+		can_manager.RegisterObject(obj_steering_angle_real);
 		
 		// Передача версий и типов в объект block_info
 		obj_block_info.SetValue(0, (About::board_type << 3 | About::board_ver), CAN_TIMER_TYPE_NORMAL);

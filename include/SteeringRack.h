@@ -65,14 +65,19 @@ namespace SteeringRack
 		if(id == RACK_1)
 		{
 			// Если была ошибка, то в CAN'е окажется послденее валидное значение.
-			CANLib::obj_steering_angle.SetValue(0, (angle * 10), CAN_TIMER_TYPE_NORMAL);
+			CANLib::obj_steering_angle_front.SetValue(0, (angle * 10), CAN_TIMER_TYPE_NORMAL);
 			
 			angleMaster = angle;
 		} else {
+			// Если была ошибка, то в CAN'е окажется послденее валидное значение.
+			CANLib::obj_steering_angle_real.SetValue(0, (angle * 10), CAN_TIMER_TYPE_NORMAL);
+
 			angleSlave = angle;
 		}
 		steerings[id].Update(angle, dt);
 		isSensorsCalculated = true;
+
+		//DEBUG_LOG_TOPIC("RACK", "id: %d, a: %f\n",id ,angle);
 
 		
 		return;
