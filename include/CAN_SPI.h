@@ -87,7 +87,7 @@ namespace CAN_SPI
 				result = sensor2.PutPacket(time, address, data, length);
 				if(result == true)
 				{
-					SteeringRack::OnDataSensor( id, sensor2.data_float->angle, sensor2.data_float->roll, sensor2.data_float->dt );
+					SteeringRack::OnDataSensor( id, (0.0 - sensor2.data_float->angle), sensor2.data_float->roll, sensor2.data_float->dt );
 				}
 				
 				break;
