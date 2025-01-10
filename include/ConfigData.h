@@ -7,11 +7,15 @@ namespace Config
 	{
 		struct
 		{
-			bool enable = false;
+			bool enable = true;
+			bool invert = false;
+			int16_t offset = 0;
 		} rack1;
 		struct
 		{
-			bool enable = false;
+			bool enable = true;
+			bool invert = true;
+			int16_t offset = 0;
 		} rack2;
 	};
 };

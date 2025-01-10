@@ -31,8 +31,8 @@ class SteeringAngleSensorBase
 			uint8_t _null;
 			uint8_t counter : 4;
 			uint8_t error : 4;
-			int16_t roll;
-			int16_t angle;
+			int16_t roll;		// 0.1 чего-то
+			int16_t angle;		// 0.1 градуса
 		};
 
 		struct sensor_t
