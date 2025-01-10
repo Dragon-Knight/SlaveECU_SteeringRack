@@ -70,7 +70,7 @@ namespace SteeringRack
 			angleMaster = angle;
 		} else {
 			// Если была ошибка, то в CAN'е окажется послденее валидное значение.
-			CANLib::obj_steering_angle_real.SetValue(0, (angle * 10), CAN_TIMER_TYPE_NORMAL);
+			CANLib::obj_steering_angle_rear.SetValue(0, (angle * 10), CAN_TIMER_TYPE_NORMAL);
 
 			angleSlave = angle;
 		}
