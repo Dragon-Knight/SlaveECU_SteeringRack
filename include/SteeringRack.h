@@ -12,7 +12,7 @@ namespace SteeringRack
 	static constexpr uint16_t PWM_MID = 1500;
 	static constexpr uint16_t PWM_MAX = 2200;
 
-	static constexpr float PID_KP = 1.0f;
+	static constexpr float PID_KP = 3.0f;
 	static constexpr float PID_KI = 0.1f;
 	static constexpr float PID_KD = 0.01f;
 
