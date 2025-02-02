@@ -96,7 +96,8 @@ class SteeringAngleSensor : public SteeringAngleSensorBase
 			
 			_sensor_data_float.angle = (float)_raw_obj->angle / 10.0f;
 			_sensor_data_float.roll = (float)_raw_obj->roll / 10.0f;
-			_sensor_data_float.dt = (float)(time - _last_time) / 1000.0f;
+			//_sensor_data_float.dt = (float)(time - _last_time) / 1000.0f;
+			_sensor_data_float.dt = 0.01;
 			
 			_last_time = time;
 			_last_count = _raw_obj->counter;

@@ -1,10 +1,16 @@
 #pragma once
 #include <inttypes.h>
+#include <math.h>
 #include <CUtils.h>
 
 class SteeringPWMControl
 {
 	static constexpr uint16_t PWM_OFF_VALUE = 0;
+	static constexpr int16_t FEEDFORWARD_VALUE = 100;
+	static constexpr int16_t DEAD_ZONE = 10;
+	static constexpr float TARGET_MIN = -600.0;
+	static constexpr float TARGET_MAX = 600.0;
+	static constexpr float MEASURED_MAX = 610.0;
 	
 	public:
 		
@@ -15,7 +21,7 @@ class SteeringPWMControl
 
 		void SetTarget(float target)
 		{
-			_target = target;
+			_target = clamp<float>(target, TARGET_MIN, TARGET_MAX);
 
 			return;
 		}
@@ -24,6 +30,7 @@ class SteeringPWMControl
 		{
 			_isStopedPWM = true;
 			__HAL_TIM_SET_COMPARE(_htim, _channel, PWM_OFF_VALUE);
+			_pid.Reset();
 			
 			return;
 		}
@@ -31,6 +38,7 @@ class SteeringPWMControl
 		void SetStartPWM()
 		{
 			_isStopedPWM = false;
+			_pid.Reset();
 			
 			return;
 		}
@@ -40,10 +48,24 @@ class SteeringPWMControl
 			if(_isStopedPWM == true) return;
 			
 			float pid_output = _pid.Calculate(_target, measured_value, dt);
-			uint16_t pwm = ((int32_t)(pid_output + 0.5f)) + (int32_t)_pwm_mid;
-			uint16_t pwm_fix = clamp<uint16_t>(pwm, _pwm_min, _pwm_max);
+			int32_t pwm = ((int32_t)(pid_output + 0.5f)) + (int32_t)_pwm_mid;
+			uint16_t pwm_fix;
 			
-			//DEBUG_LOG_TOPIC("Set pwm", "pid: %f, val: %d, val_fix: %d;\n", pid_output, pwm, pwm_fix);
+			// Задание начального тока, чтобы хватало мощности для поворота на маленьких значениях.
+			if(pwm > _pwm_mid + DEAD_ZONE) pwm += FEEDFORWARD_VALUE;
+			if(pwm < _pwm_mid - DEAD_ZONE) pwm -= FEEDFORWARD_VALUE;
+			pwm_fix = clamp<int32_t>(pwm, _pwm_min, _pwm_max);
+			
+			DEBUG_LOG_TOPIC("Set pwm", "pid: %f, pwm: %d, pwm_fix: %d, target: %f, measured: %f;\n", pid_output, pwm, pwm_fix, _target, measured_value);
+			
+			if(abs(measured_value) > MEASURED_MAX)
+			{
+				SetStopPWM();
+				
+				DEBUG_LOG_TOPIC("pwm","STOP\n");
+				
+				return;
+			}
 			__HAL_TIM_SET_COMPARE(_htim, _channel, pwm_fix);
 			
 			return;

@@ -8,12 +8,12 @@ extern TIM_HandleTypeDef htim4;
 namespace SteeringRack
 {
 	
-	static constexpr uint16_t PWM_MIN = 800;
+	static constexpr uint16_t PWM_MIN = 900;
 	static constexpr uint16_t PWM_MID = 1500;
-	static constexpr uint16_t PWM_MAX = 2200;
+	static constexpr uint16_t PWM_MAX = 2100;
 
-	static constexpr float PID_KP = 3.0f;
-	static constexpr float PID_KI = 0.1f;
+	static constexpr float PID_KP = 5.0f;
+	static constexpr float PID_KI = 0.5f;
 	static constexpr float PID_KD = 0.01f;
 
 	static constexpr float ANGLE_MID = 0.0f;
