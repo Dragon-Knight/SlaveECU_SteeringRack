@@ -161,14 +161,16 @@ namespace SteeringRack
 				break;
 			}
 		}
+
+		CANLib::obj_turn_mode.SetValue(0, mode, CAN_TIMER_TYPE_NONE, CAN_EVENT_TYPE_NORMAL);
 		
 		return;
 	}
 	
 	// Получение по CANу команды установки угла поворота
-	void OnChangeTarget(float target)
+	void OnChangeTarget(int16_t raw, float target)
 	{
-
+		CANLib::obj_target_angle.SetValue(0, raw, CAN_TIMER_TYPE_NONE, CAN_EVENT_TYPE_NORMAL);
 
 		return;
 	}
@@ -191,9 +193,10 @@ namespace SteeringRack
 		
 		CANLib::obj_target_angle.RegisterFunctionSet([](can_frame_t &can_frame, can_error_t &error) -> can_result_t
 		{
-			target = (float)(can_frame.data[0] | (can_frame.data[1] << 8)) / 10.0f;
+			int16_t raw = (can_frame.data[0] | (can_frame.data[1] << 8));
+			target = (float)raw / 10.0f;
 
-			OnChangeTarget(target);
+			OnChangeTarget(raw, target);
 			
 			can_frame.function_id = CAN_FUNC_EVENT_OK;
 			return CAN_RESULT_CAN_FRAME;
